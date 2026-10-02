@@ -1,0 +1,6 @@
+group: io.kestra.plugin.alibaba.sls
+name: "sls"
+title: "Simple Log Service (SLS)"
+description: "Tasks and triggers for Alibaba Cloud Simple Log Service (SLS) log analytics and ingestion."
+body: ""
+videos: []

@@ -35,18 +35,20 @@
 </p>
 <p align="center" style="color:grey;"><i>Get started with Kestra in 3 minutes.</i></p>
 
-# Kestra Plugin Template
+# Alibaba Cloud Plugin for Kestra
 
 ## Why
 
-- What user problem does this solve? Teams need a concrete starting point for building and validating new Kestra plugins without recreating the same project scaffolding from scratch.
-- Why would a team adopt this plugin in a workflow? It gives plugin authors a ready-made reference repo they can adapt alongside their own build, test, and publishing workflow.
-- What operational/business outcome does it enable? It shortens plugin delivery time, reduces setup mistakes, and makes internal or partner plugin development more repeatable.
+- What user problem does this solve? Enables running SQL on Alibaba Cloud MaxCompute data warehouse, ingesting and querying logs in Simple Log Service (SLS), and triggering reactive flows on new data or logs natively within Kestra without custom scripts or external CLI dependencies.
+- Why would a team adopt this plugin in a workflow? Native tasks give typed properties, secret masking, stored result sets, remote cancellation support, and exactly-once event triggers.
+- What operational/business outcome does it enable? It simplifies cloud data warehouse orchestration and log monitoring on Alibaba Cloud.
 
 ## What
 
-- Provides plugin components under `io.kestra.plugin.templates`.
-- Includes classes such as `Example`, `Trigger`.
+- Provides plugin components under `io.kestra.plugin.alibaba.maxcompute` and `io.kestra.plugin.alibaba.sls`.
+- Includes classes:
+  - MaxCompute: `Query`, `Trigger`
+  - Simple Log Service (SLS): `Query`, `Push`, `Trigger`
 
 ## Running Kestra locally with this plugin
 
