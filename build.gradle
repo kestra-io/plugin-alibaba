@@ -51,7 +51,15 @@ dependencies {
     compileOnly group: "io.kestra", name: "script", version: kestraVersion
 
     // Alibaba Cloud OSS Java SDK (V1, stable)
-    implementation "com.aliyun.oss:aliyun-sdk-oss:3.18.2"
+    // The aliyun-java-sdk-* modules are only needed for ECS/RAM-role credential providers, which this plugin does not use
+    // (AccessKey + optional STS token only). Their POMs also declare an empty <license/>, which makes the
+    // always-on CycloneDX SBOM task fail validation.
+    implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.2") {
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-core"
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-ram"
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-kms"
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-ecs"
+    }
 }
 
 
