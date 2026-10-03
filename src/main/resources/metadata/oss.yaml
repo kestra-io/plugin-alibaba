@@ -1,0 +1,8 @@
+group: io.kestra.plugin.alibaba.oss
+name: "oss"
+title: "Alibaba Cloud OSS"
+description: "Move files between Kestra internal storage and Alibaba Cloud Object Storage Service (OSS) buckets"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
