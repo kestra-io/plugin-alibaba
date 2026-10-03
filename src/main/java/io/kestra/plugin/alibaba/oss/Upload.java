@@ -88,7 +88,8 @@ public class Upload extends AbstractOss implements RunnableTask<Upload.Output> {
             Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
         }
 
-        try (OSS oss = client(runContext)) {
+        try (Client client = client(runContext)) {
+            OSS oss = client.getOss();
             File file = tempFile.toFile();
             PutObjectResult result = oss.putObject(bucket, key, file);
             runContext.logger().debug("Uploaded {} bytes to oss://{}/{}", file.length(), bucket, key);

@@ -67,7 +67,8 @@ public class Download extends AbstractOss implements RunnableTask<Download.Outpu
         String bucket = runContext.render(this.bucket).as(String.class).orElseThrow();
         String key = runContext.render(this.key).as(String.class).orElseThrow();
 
-        try (OSS oss = client(runContext)) {
+        try (Client client = client(runContext)) {
+            OSS oss = client.getOss();
             OSSObject object = oss.getObject(bucket, key);
 
             Path tempFile = runContext.workingDir().createTempFile();

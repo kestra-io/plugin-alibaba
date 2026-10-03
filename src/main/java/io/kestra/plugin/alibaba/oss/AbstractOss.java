@@ -37,9 +37,9 @@ public abstract class AbstractOss extends AbstractConnection {
     protected Property<Boolean> pathStyleAccess = Property.ofValue(false);
 
     /**
-     * Builds an OSS client. The returned client must be closed by the caller, use it in a try-with-resources.
+     * Builds an OSS client. The returned wrapper must be closed by the caller, use it in a try-with-resources.
      */
-    protected OSS client(RunContext runContext) throws IllegalVariableEvaluationException {
+    protected Client client(RunContext runContext) throws IllegalVariableEvaluationException {
         String endpoint = runContext.render(this.endpointOverride).as(String.class).orElse(null);
         if (endpoint == null) {
             String regionId = runContext.render(this.region).as(String.class)
@@ -56,6 +56,26 @@ public abstract class AbstractOss extends AbstractConnection {
         ClientBuilderConfiguration configuration = new ClientBuilderConfiguration();
         configuration.setSLDEnabled(runContext.render(this.pathStyleAccess).as(Boolean.class).orElse(false));
 
-        return new OSSClientBuilder().build(endpoint, id, secret, token, configuration);
+        return new Client(new OSSClientBuilder().build(endpoint, id, secret, token, configuration));
+    }
+
+    /**
+     * The OSS SDK client is not {@link AutoCloseable}, this wrapper shuts it down on close.
+     */
+    public static final class Client implements AutoCloseable {
+        private final OSS oss;
+
+        private Client(OSS oss) {
+            this.oss = oss;
+        }
+
+        public OSS getOss() {
+            return oss;
+        }
+
+        @Override
+        public void close() {
+            oss.shutdown();
+        }
     }
 }
