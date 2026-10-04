@@ -1,26 +1,40 @@
-# Alibaba Cloud plugin
+# How to use the Alibaba Cloud plugin
 
-Tasks to integrate Kestra flows with Alibaba Cloud services.
+This plugin integrates Kestra flows with Alibaba Cloud. It currently covers Object Storage Service (OSS) through the `io.kestra.plugin.alibaba.oss` tasks. See the [OSS Java SDK reference](https://www.alibabacloud.com/help/en/oss/developer-reference/oss-java-sdk/) for the underlying API.
 
-## OSS
+## Authentication
 
-The `io.kestra.plugin.alibaba.oss` tasks move files between Kestra internal storage and Object Storage Service (OSS) buckets.
+Every task needs an AccessKey pair, and a Security Token Service (STS) token when you use temporary credentials.
 
-### Authentication
+- `accessKeyId`: the AccessKey ID.
+- `accessKeySecret`: the AccessKey secret.
+- `securityToken`: optional STS token.
+- `region`: the region ID, for example `cn-hangzhou`. The endpoint defaults to `https://oss-<region>.aliyuncs.com`.
+- `endpointOverride`: optional http or https URL that replaces the region-derived endpoint, for example for an emulator. Treat it as trusted input.
 
-Provide an AccessKey ID and secret, and optionally a Security Token Service (STS) token for temporary credentials. Store them as Kestra secrets:
+Store the credentials as [secrets](https://kestra.io/docs/concepts/secret) and set them once for all tasks with [plugin defaults](https://kestra.io/docs/workflow-components/plugin-defaults):
 
 ```yaml
-accessKeyId: "{{ secret('ALIBABA_ACCESS_KEY_ID') }}"
-accessKeySecret: "{{ secret('ALIBABA_ACCESS_KEY_SECRET') }}"
-region: cn-hangzhou
+pluginDefaults:
+  - type: io.kestra.plugin.alibaba.oss
+    values:
+      accessKeyId: "{{ secret('ALIBABA_ACCESS_KEY_ID') }}"
+      accessKeySecret: "{{ secret('ALIBABA_ACCESS_KEY_SECRET') }}"
+      region: cn-hangzhou
 ```
 
-The endpoint defaults to `https://oss-<region>.aliyuncs.com`. Use `endpointOverride` to target another endpoint, and `pathStyleAccess: true` for emulators addressed by IP or hostname.
+## Tasks
 
-### Available tasks
+### `io.kestra.plugin.alibaba.oss.Upload`
 
-- `Upload`: upload a `kestra://` file to a bucket key, outputs `etag` and `key`.
-- `Download`: download an object to internal storage, outputs `uri` and `size`.
+Uploads a file from Kestra internal storage to a bucket. The file is sent in a single request, so it is limited to 5 GB.
 
-Run `./gradlew lintPluginDocs` before pushing to validate the plugin documentation.
+- Required: `bucket`, `key`, `from`.
+- Outputs: `etag`, `key`.
+
+### `io.kestra.plugin.alibaba.oss.Download`
+
+Downloads an object into Kestra internal storage.
+
+- Required: `bucket`, `key`.
+- Outputs: `uri`, `size`.

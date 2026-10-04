@@ -9,11 +9,16 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.alibaba.AbstractConnection;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+
+import java.net.URI;
+import java.util.regex.Pattern;
 
 @SuperBuilder
 @ToString
@@ -21,10 +26,13 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractOss extends AbstractConnection {
+    private static final Pattern REGION_PATTERN = Pattern.compile("^[a-z0-9-]+$");
+
     @Schema(
         title = "Bucket",
         description = "The name of the OSS bucket."
     )
+    @NotNull
     @PluginProperty(group = "main")
     protected Property<String> bucket;
 
@@ -33,35 +41,55 @@ public abstract class AbstractOss extends AbstractConnection {
         description = "Address buckets as `<endpoint>/<bucket>` instead of `<bucket>.<endpoint>`. Useful with custom endpoints such as a local emulator."
     )
     @PluginProperty(group = "advanced")
-    @lombok.Builder.Default
+    @Builder.Default
     protected Property<Boolean> pathStyleAccess = Property.ofValue(false);
 
-    /**
-     * Builds an OSS client. The returned wrapper must be closed by the caller, use it in a try-with-resources.
-     */
+    protected String rBucket(RunContext runContext) throws IllegalVariableEvaluationException {
+        return required(runContext, this.bucket, "bucket");
+    }
+
+    protected static String required(RunContext runContext, Property<String> property, String name) throws IllegalVariableEvaluationException {
+        return runContext.render(property).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("`" + name + "` is required"));
+    }
+
     protected Client client(RunContext runContext) throws IllegalVariableEvaluationException {
-        String endpoint = runContext.render(this.endpointOverride).as(String.class).orElse(null);
+        var endpoint = runContext.render(this.endpointOverride).as(String.class).orElse(null);
         if (endpoint == null) {
-            String regionId = runContext.render(this.region).as(String.class)
+            var regionId = runContext.render(this.region).as(String.class)
                 .orElseThrow(() -> new IllegalArgumentException("Either `region` or `endpointOverride` must be set"));
+            if (!REGION_PATTERN.matcher(regionId).matches()) {
+                throw new IllegalArgumentException("`region` must only contain lowercase letters, digits and dashes, got: " + regionId);
+            }
             endpoint = "https://oss-" + regionId + ".aliyuncs.com";
+        } else {
+            validateEndpoint(endpoint);
         }
 
-        String id = runContext.render(this.accessKeyId).as(String.class)
-            .orElseThrow(() -> new IllegalArgumentException("`accessKeyId` is required"));
-        String secret = runContext.render(this.accessKeySecret).as(String.class)
-            .orElseThrow(() -> new IllegalArgumentException("`accessKeySecret` is required"));
-        String token = runContext.render(this.securityToken).as(String.class).orElse(null);
+        var id = required(runContext, this.accessKeyId, "accessKeyId");
+        var secret = required(runContext, this.accessKeySecret, "accessKeySecret");
+        var token = runContext.render(this.securityToken).as(String.class).orElse(null);
 
-        ClientBuilderConfiguration configuration = new ClientBuilderConfiguration();
+        var configuration = new ClientBuilderConfiguration();
         configuration.setSLDEnabled(runContext.render(this.pathStyleAccess).as(Boolean.class).orElse(false));
 
         return new Client(new OSSClientBuilder().build(endpoint, id, secret, token, configuration));
     }
 
-    /**
-     * The OSS SDK client is not {@link AutoCloseable}, this wrapper shuts it down on close.
-     */
+    private static void validateEndpoint(String endpoint) {
+        URI uri;
+        try {
+            uri = URI.create(endpoint);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("`endpointOverride` is not a valid URL: " + endpoint, e);
+        }
+
+        var scheme = uri.getScheme();
+        if (uri.getHost() == null || scheme == null || !(scheme.equals("http") || scheme.equals("https"))) {
+            throw new IllegalArgumentException("`endpointOverride` must be an http or https URL, got: " + endpoint);
+        }
+    }
+
     public static final class Client implements AutoCloseable {
         private final OSS oss;
 

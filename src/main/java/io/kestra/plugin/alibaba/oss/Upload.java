@@ -1,7 +1,5 @@
 package io.kestra.plugin.alibaba.oss;
 
-import com.aliyun.oss.OSS;
-import com.aliyun.oss.model.PutObjectResult;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -17,11 +15,9 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-import java.io.File;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 @SuperBuilder
@@ -31,7 +27,7 @@ import java.nio.file.StandardCopyOption;
 @NoArgsConstructor
 @Schema(
     title = "Upload a file to an OSS bucket",
-    description = "Uploads a file from Kestra internal storage to the given bucket and key."
+    description = "Uploads a file from Kestra internal storage to the given bucket and key. The file is sent in a single request, so it is limited to 5 GB, the maximum size of a simple OSS upload."
 )
 @Plugin(
     examples = {
@@ -78,25 +74,30 @@ public class Upload extends AbstractOss implements RunnableTask<Upload.Output> {
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String bucket = runContext.render(this.bucket).as(String.class).orElseThrow();
-        String key = runContext.render(this.key).as(String.class).orElseThrow();
-        URI source = URI.create(runContext.render(this.from).as(String.class).orElseThrow());
+        var rBucket = rBucket(runContext);
+        var rKey = required(runContext, this.key, "key");
+        var rFrom = required(runContext, this.from, "from");
 
-        // copy to a local file first so the request carries a Content-Length
-        Path tempFile = runContext.workingDir().createTempFile();
+        URI source;
+        try {
+            source = URI.create(rFrom);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("`from` is not a valid URI: " + rFrom, e);
+        }
+
+        var tempFile = runContext.workingDir().createTempFile();
         try (InputStream inputStream = runContext.storage().getFile(source)) {
             Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
         }
 
-        try (Client client = client(runContext)) {
-            OSS oss = client.getOss();
-            File file = tempFile.toFile();
-            PutObjectResult result = oss.putObject(bucket, key, file);
-            runContext.logger().debug("Uploaded {} bytes to oss://{}/{}", file.length(), bucket, key);
+        try (var client = client(runContext)) {
+            var file = tempFile.toFile();
+            var result = client.getOss().putObject(rBucket, rKey, file);
+            runContext.logger().debug("Uploaded {} bytes to oss://{}/{}", file.length(), rBucket, rKey);
 
             return Output.builder()
                 .etag(result.getETag())
-                .key(key)
+                .key(rKey)
                 .build();
         }
     }

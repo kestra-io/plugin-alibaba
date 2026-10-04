@@ -1,7 +1,5 @@
 package io.kestra.plugin.alibaba.oss;
 
-import com.aliyun.oss.OSS;
-import com.aliyun.oss.model.OSSObject;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -20,7 +18,6 @@ import lombok.experimental.SuperBuilder;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 @SuperBuilder
@@ -64,21 +61,20 @@ public class Download extends AbstractOss implements RunnableTask<Download.Outpu
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String bucket = runContext.render(this.bucket).as(String.class).orElseThrow();
-        String key = runContext.render(this.key).as(String.class).orElseThrow();
+        var rBucket = rBucket(runContext);
+        var rKey = required(runContext, this.key, "key");
 
-        try (Client client = client(runContext)) {
-            OSS oss = client.getOss();
-            OSSObject object = oss.getObject(bucket, key);
+        try (var client = client(runContext)) {
+            var object = client.getOss().getObject(rBucket, rKey);
 
-            Path tempFile = runContext.workingDir().createTempFile();
+            var tempFile = runContext.workingDir().createTempFile();
             try (InputStream inputStream = object.getObjectContent()) {
                 Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
             }
 
-            long size = Files.size(tempFile);
-            URI uri = runContext.storage().putFile(tempFile.toFile());
-            runContext.logger().debug("Downloaded oss://{}/{} ({} bytes)", bucket, key, size);
+            var size = Files.size(tempFile);
+            var uri = runContext.storage().putFile(tempFile.toFile());
+            runContext.logger().debug("Downloaded oss://{}/{} ({} bytes)", rBucket, rKey, size);
 
             return Output.builder()
                 .uri(uri)
