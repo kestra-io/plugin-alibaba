@@ -41,6 +41,7 @@
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
 - Includes the OSS tasks `Upload` and `Download` for moving files between Kestra internal storage and Alibaba Cloud Object Storage Service buckets.
+- Includes the Function Compute task `Invoke` for calling Alibaba Cloud serverless functions synchronously or asynchronously.
 
 ## Usage
 

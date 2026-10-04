@@ -1,0 +1,8 @@
+group: io.kestra.plugin.alibaba.fc
+name: "fc"
+title: "Alibaba Cloud Function Compute"
+description: "Invoke Alibaba Cloud Function Compute (FC) serverless functions"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

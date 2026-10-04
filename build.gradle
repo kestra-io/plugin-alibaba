@@ -56,6 +56,7 @@ dependencies {
         exclude group: "com.aliyun", module: "aliyun-java-sdk-kms"
         exclude group: "com.aliyun", module: "aliyun-java-sdk-ecs"
     }
+    implementation "com.aliyun:fc20230330:4.8.2"
 }
 
 
