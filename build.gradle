@@ -29,7 +29,7 @@ java {
 }
 
 group = "io.kestra.plugin"
-description = 'Plugin template for Kestra'
+description = 'Alibaba Cloud plugin for Kestra'
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
@@ -49,6 +49,14 @@ dependencies {
     annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
     compileOnly group: "io.kestra", name: "script", version: kestraVersion
+
+    implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.2") {
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-core"
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-ram"
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-kms"
+        exclude group: "com.aliyun", module: "aliyun-java-sdk-ecs"
+    }
+    implementation "com.aliyun:fc20230330:4.8.2"
 }
 
 
@@ -87,6 +95,9 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
+
+    // mock OSS endpoint, no cloud credentials needed in CI
+    testImplementation "org.wiremock:wiremock-jetty12"
 }
 
 /**********************************************************************************************************************\
@@ -151,8 +162,8 @@ jar {
     manifest {
         attributes(
             "X-Kestra-Name": project.name,
-            "X-Kestra-Title": "Template",
-            "X-Kestra-Group": project.group + ".templates",
+            "X-Kestra-Title": "Alibaba Cloud",
+            "X-Kestra-Group": project.group + ".alibaba",
             "X-Kestra-Description": project.description,
             "X-Kestra-Version": project.version
         )
