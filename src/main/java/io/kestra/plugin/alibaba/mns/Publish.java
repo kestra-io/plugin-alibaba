@@ -110,6 +110,9 @@ public class Publish extends AbstractMns implements RunnableTask<Publish.Output>
     public Output run(RunContext runContext) throws Exception {
         var rQueue = rQueue(runContext);
 
+        // rows read from a file may hold untrusted content, only inline messages written in the flow are rendered
+        var renderData = !(from instanceof String);
+
         try (var client = client(runContext)) {
             var queue = client.queue(rQueue);
             var total = new AtomicInteger();
@@ -120,7 +123,7 @@ public class Publish extends AbstractMns implements RunnableTask<Publish.Output>
                 .doOnNext(throwConsumer(batch -> {
                     var messages = new ArrayList<com.aliyun.mns.model.Message>(batch.size());
                     for (var message : batch) {
-                        messages.add(message.toMns(runContext));
+                        messages.add(message.toMns(runContext, renderData));
                     }
                     try {
                         queue.batchPutMessage(messages);

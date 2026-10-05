@@ -123,6 +123,23 @@ class MnsTest {
     }
 
     @Test
+    void publishDoesNotRenderFileContent() throws Exception {
+        stubPublishOk();
+
+        var runContext = runContextFactory.of(Map.of());
+        var file = runContext.workingDir().createTempFile(".ion").toFile();
+        try (var output = new FileOutputStream(file)) {
+            FileSerde.write(output, Map.of("data", "{{ 1 + 1 }}"));
+        }
+        var uri = runContext.storage().putFile(file);
+
+        publish(Property.ofValue("cn-hangzhou"), uri.toString()).run(runContext);
+
+        wireMock.verify(postRequestedFor(urlPathEqualTo(PATH))
+            .withRequestBody(containing("<MessageBody>{{ 1 + 1 }}</MessageBody>")));
+    }
+
+    @Test
     void publishFailsOnAccessDenied() {
         wireMock.stubFor(post(urlPathEqualTo(PATH)).willReturn(error(403, "AccessDenied")));
 

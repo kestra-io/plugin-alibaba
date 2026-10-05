@@ -46,7 +46,8 @@ Downloads an object into Kestra internal storage.
 
 Sends messages to a queue in batches of 16.
 
-- Required: `queue`, `from` (a message, a list of messages, or a `kestra://` ION file with one message per row). Each message has a `data` field (a string, rendered at runtime, or a map or list sent as JSON) and optional `delaySeconds` and `priority`.
+- Required: `queue`, `from` (a message, a list of messages, or a `kestra://` ION file with one message per row). Each message has a `data` field (a string, or a map or list sent as JSON) and optional `delaySeconds` and `priority`.
+- Strings in inline messages are rendered at runtime. Rows read from a `kestra://` file are sent as is, so file content is never evaluated as a template.
 - Outputs: `messagesCount`.
 
 ### `io.kestra.plugin.alibaba.mns.Consume`
