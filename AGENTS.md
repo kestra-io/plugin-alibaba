@@ -1,38 +1,44 @@
-# Kestra Template Plugin
+# Kestra Alibaba Cloud Plugin
 
 ## What
 
-- Provides plugin components under `io.kestra.plugin.templates`.
-- Includes classes such as `Example`, `Trigger`.
+- Provides plugin components under `io.kestra.plugin.alibaba`.
+- Includes classes such as `Upload`, `Download`, `List`, `Start`, `Stop`, `Reboot`.
 
 ## Why
 
-- What user problem does this solve? Teams need a concrete starting point for building and validating new Kestra plugins without recreating the same project scaffolding from scratch.
-- Why would a team adopt this plugin in a workflow? It gives plugin authors a ready-made reference repo they can adapt alongside their own build, test, and publishing workflow.
-- What operational/business outcome does it enable? It shortens plugin delivery time, reduces setup mistakes, and makes internal or partner plugin development more repeatable.
+- This plugin integrates Kestra with Alibaba Cloud OSS and ECS.
+- It moves files between Kestra internal storage and OSS buckets with typed properties, secret masking and outputs that plug into downstream tasks.
+- It lists, starts, stops and reboots ECS instances so flows can manage compute around their workloads.
 
 ## How
 
 ### Architecture
 
-Single-module plugin. Source packages under `io.kestra.plugin`:
+Single-module plugin. Source packages under `io.kestra.plugin.alibaba`:
 
-- `templates`
+- `oss`
+- `ecs`
 
-Infrastructure dependencies (Docker Compose services):
+The root package holds the shared connection base (`AlibabaConnectionInterface`, `AbstractConnection`). The `oss` package holds `AbstractOss`, which builds the OSS client, and the tasks. The `ecs` package holds `AbstractEcs`, which builds the ECS client, `AbstractInstanceAction`, shared by `Start`, `Stop` and `Reboot`, and `List`.
 
-- `app`
+Tests run against a WireMock server standing in for the OSS and ECS endpoints, so no cloud credentials are needed.
 
 ### Key Plugin Classes
 
-- `io.kestra.plugin.templates.Example`
+- `io.kestra.plugin.alibaba.oss.Upload`
+- `io.kestra.plugin.alibaba.oss.Download`
+- `io.kestra.plugin.alibaba.ecs.List`
+- `io.kestra.plugin.alibaba.ecs.Start`
+- `io.kestra.plugin.alibaba.ecs.Stop`
+- `io.kestra.plugin.alibaba.ecs.Reboot`
 
 ### Project Structure
 
 ```
-plugin-template/
-├── src/main/java/io/kestra/plugin/templates/
-├── src/test/java/io/kestra/plugin/templates/
+plugin-alibaba/
+├── src/main/java/io/kestra/plugin/alibaba/
+├── src/test/java/io/kestra/plugin/alibaba/
 ├── build.gradle
 └── README.md
 ```
