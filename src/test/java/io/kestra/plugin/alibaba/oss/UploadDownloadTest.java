@@ -1,6 +1,5 @@
 package io.kestra.plugin.alibaba.oss;
 
-import com.aliyun.oss.OSSException;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import io.kestra.core.junit.annotations.KestraTest;
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
@@ -74,7 +74,8 @@ class UploadDownloadTest {
 
         assertThat(output.getKey(), is("landing/data.txt"));
         assertThat(output.getEtag(), notNullValue());
-        wireMock.verify(putRequestedFor(urlEqualTo("/my-bucket/landing/data.txt")));
+        wireMock.verify(putRequestedFor(urlEqualTo("/my-bucket/landing/data.txt"))
+            .withRequestBody(equalTo("hello oss")));
     }
 
     @Test
@@ -174,7 +175,39 @@ class UploadDownloadTest {
 
         var runContext = runContextFactory.of(Map.of());
 
-        assertThrows(OSSException.class, () -> download("missing.txt").run(runContext));
+        var exception = assertThrows(IOException.class, () -> download("missing.txt").run(runContext));
+        assertThat(exception.getMessage(), containsString("oss://my-bucket/missing.txt"));
+    }
+
+    @Test
+    void downloadFailsWhenAccessIsDenied() {
+        wireMock.stubFor(get(urlEqualTo("/my-bucket/secret.txt"))
+            .willReturn(aResponse()
+                .withStatus(403)
+                .withHeader("Content-Type", "application/xml")
+                .withBody("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>AccessDenied</Code><Message>You have no right to access this object.</Message></Error>")));
+
+        var runContext = runContextFactory.of(Map.of());
+
+        var exception = assertThrows(IOException.class, () -> download("secret.txt").run(runContext));
+        assertThat(exception.getMessage(), containsString("read access"));
+    }
+
+    @Test
+    void failsWithoutRegionOrEndpoint() {
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = Download.builder()
+            .id("download")
+            .type(Download.class.getName())
+            .accessKeyId(Property.ofValue("test-id"))
+            .accessKeySecret(Property.ofValue("test-secret"))
+            .bucket(Property.ofValue("my-bucket"))
+            .key(Property.ofValue("data.txt"))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+        assertThat(exception.getMessage(), containsString("region"));
     }
 
     @Test

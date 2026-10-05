@@ -30,6 +30,7 @@ pluginDefaults:
 Uploads a file from Kestra internal storage to a bucket. The file is sent in a single request, so it is limited to 5 GB.
 
 - Required: `bucket`, `key`, `from`.
+- Optional: `pathStyleAccess` (address buckets as `<endpoint>/<bucket>`, useful with emulators).
 - Outputs: `etag`, `key`.
 
 ### `io.kestra.plugin.alibaba.oss.Download`
@@ -37,4 +38,5 @@ Uploads a file from Kestra internal storage to a bucket. The file is sent in a s
 Downloads an object into Kestra internal storage.
 
 - Required: `bucket`, `key`.
+- Optional: `pathStyleAccess`.
 - Outputs: `uri`, `size`.
