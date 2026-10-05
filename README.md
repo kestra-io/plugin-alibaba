@@ -35,18 +35,34 @@
 </p>
 <p align="center" style="color:grey;"><i>Get started with Kestra in 3 minutes.</i></p>
 
-# Kestra Plugin Template
-
-## Why
-
-- What user problem does this solve? Teams need a concrete starting point for building and validating new Kestra plugins without recreating the same project scaffolding from scratch.
-- Why would a team adopt this plugin in a workflow? It gives plugin authors a ready-made reference repo they can adapt alongside their own build, test, and publishing workflow.
-- What operational/business outcome does it enable? It shortens plugin delivery time, reduces setup mistakes, and makes internal or partner plugin development more repeatable.
+# Kestra Alibaba Cloud Plugin
 
 ## What
 
-- Provides plugin components under `io.kestra.plugin.templates`.
-- Includes classes such as `Example`, `Trigger`.
+- Provides plugin components under `io.kestra.plugin.alibaba`.
+- Includes the OSS tasks `Upload` and `Download` for moving files between Kestra internal storage and Alibaba Cloud Object Storage Service buckets.
+- Includes the MNS tasks `Publish` and `Consume` and the `Trigger` and `RealtimeTrigger` triggers for Alibaba Cloud Message Service queues.
+
+## Usage
+
+```yaml
+id: oss_upload
+namespace: company.team
+
+inputs:
+  - id: file
+    type: FILE
+
+tasks:
+  - id: upload
+    type: io.kestra.plugin.alibaba.oss.Upload
+    accessKeyId: "{{ secret('ALIBABA_ACCESS_KEY_ID') }}"
+    accessKeySecret: "{{ secret('ALIBABA_ACCESS_KEY_SECRET') }}"
+    region: cn-hangzhou
+    bucket: my-bucket
+    key: "landing/{{ inputs.file | fileName }}"
+    from: "{{ inputs.file }}"
+```
 
 ## Running Kestra locally with this plugin
 
