@@ -56,6 +56,11 @@ dependencies {
         exclude group: "com.aliyun", module: "aliyun-java-sdk-kms"
         exclude group: "com.aliyun", module: "aliyun-java-sdk-ecs"
     }
+    implementation("com.aliyun.mns:aliyun-sdk-mns:2.0.0") {
+        exclude group: "org.json", module: "json"
+        exclude group: "org.jacoco", module: "org.jacoco.agent"
+    }
+    runtimeOnly "com.sun.xml.bind:jaxb-impl:2.3.9"
 }
 
 
@@ -97,6 +102,7 @@ dependencies {
 
     // mock OSS endpoint, no cloud credentials needed in CI
     testImplementation "org.wiremock:wiremock-jetty12"
+    testImplementation "ch.qos.logback:logback-classic"
 }
 
 /**********************************************************************************************************************\

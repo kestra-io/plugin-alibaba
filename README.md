@@ -41,6 +41,7 @@
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
 - Includes the OSS tasks `Upload` and `Download` for moving files between Kestra internal storage and Alibaba Cloud Object Storage Service buckets.
+- Includes the MNS tasks `Publish` and `Consume` and the `Trigger` and `RealtimeTrigger` triggers for Alibaba Cloud Message Service queues.
 
 ## Usage
 
