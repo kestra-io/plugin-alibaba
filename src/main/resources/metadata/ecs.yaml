@@ -1,0 +1,8 @@
+group: io.kestra.plugin.alibaba.ecs
+name: "ecs"
+title: "Alibaba Cloud ECS"
+description: "List, start, stop and reboot Alibaba Cloud Elastic Compute Service (ECS) instances"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

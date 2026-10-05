@@ -41,6 +41,7 @@
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
 - Includes the OSS tasks `Upload` and `Download` for moving files between Kestra internal storage and Alibaba Cloud Object Storage Service buckets.
+- Includes the ECS tasks `List`, `Start`, `Stop` and `Reboot` for managing Alibaba Cloud Elastic Compute Service instances.
 
 ## Usage
 
