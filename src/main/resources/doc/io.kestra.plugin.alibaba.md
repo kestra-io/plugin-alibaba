@@ -10,7 +10,9 @@ Every task needs an AccessKey pair, and a Security Token Service (STS) token whe
 - `accessKeySecret`: the AccessKey secret.
 - `securityToken`: optional STS token.
 - `region`: the region ID, for example `cn-hangzhou`. The endpoint defaults to `https://oss-<region>.aliyuncs.com`.
-- `endpointOverride`: optional http or https URL that replaces the region-derived endpoint, for example for an emulator. Treat it as trusted input.
+- `endpointOverride`: optional URL that replaces the region-derived endpoint. It must use https, unless `pathStyleAccess` is true, which allows plain http for local emulators. Treat it as trusted input, because signed requests and the STS token are sent to it.
+
+Role-based credentials (ECS instance roles and RAM roles) are not supported.
 
 Store the credentials as [secrets](https://kestra.io/docs/concepts/secret) and set them once for all tasks with [plugin defaults](https://kestra.io/docs/workflow-components/plugin-defaults):
 

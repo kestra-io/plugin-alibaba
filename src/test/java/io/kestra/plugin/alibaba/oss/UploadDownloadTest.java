@@ -5,6 +5,7 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.utils.IdUtils;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -87,7 +88,7 @@ class UploadDownloadTest {
         var source = runContext.storage().putFile(sourceFile);
 
         var task = Upload.builder()
-            .id("upload")
+            .id(IdUtils.create())
             .type(Upload.class.getName())
             .accessKeyId(Property.ofValue("test-id"))
             .accessKeySecret(Property.ofValue("test-secret"))
@@ -123,7 +124,7 @@ class UploadDownloadTest {
         var runContext = runContextFactory.of(Map.of());
 
         var task = Upload.builder()
-            .id("upload")
+            .id(IdUtils.create())
             .type(Upload.class.getName())
             .accessKeyId(Property.ofValue("test-id"))
             .accessKeySecret(Property.ofValue("test-secret"))
@@ -198,7 +199,7 @@ class UploadDownloadTest {
         var runContext = runContextFactory.of(Map.of());
 
         var task = Download.builder()
-            .id("download")
+            .id(IdUtils.create())
             .type(Download.class.getName())
             .accessKeyId(Property.ofValue("test-id"))
             .accessKeySecret(Property.ofValue("test-secret"))
@@ -211,11 +212,66 @@ class UploadDownloadTest {
     }
 
     @Test
+    void uploadFailsWhenAccessIsDenied() throws Exception {
+        wireMock.stubFor(put(urlEqualTo("/my-bucket/landing/data.txt"))
+            .willReturn(aResponse()
+                .withStatus(403)
+                .withHeader("Content-Type", "application/xml")
+                .withBody("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>AccessDenied</Code><Message>You have no right to access this object.</Message></Error>")));
+
+        var runContext = runContextFactory.of(Map.of());
+        var source = runContext.storage().putFile(sourceFile);
+
+        var exception = assertThrows(IOException.class, () -> upload(Property.ofValue(source.toString())).run(runContext));
+        assertThat(exception.getMessage(), containsString("oss://my-bucket/landing/data.txt"));
+        assertThat(exception.getMessage(), containsString("write access"));
+    }
+
+    @Test
+    void uploadFailsWhenBucketIsMissing() throws Exception {
+        wireMock.stubFor(put(urlEqualTo("/my-bucket/landing/data.txt"))
+            .willReturn(aResponse()
+                .withStatus(404)
+                .withHeader("Content-Type", "application/xml")
+                .withBody("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist.</Message></Error>")));
+
+        var runContext = runContextFactory.of(Map.of());
+        var source = runContext.storage().putFile(sourceFile);
+
+        var exception = assertThrows(IOException.class, () -> upload(Property.ofValue(source.toString())).run(runContext));
+        assertThat(exception.getMessage(), containsString("NoSuchBucket"));
+    }
+
+    @Test
+    void downloadFailsWhenEndpointIsUnreachable() {
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = downloadBuilder("data.txt")
+            .endpointOverride(Property.ofValue("http://127.0.0.1:1"))
+            .build();
+
+        var exception = assertThrows(IOException.class, () -> task.run(runContext));
+        assertThat(exception.getMessage(), containsString("endpointOverride"));
+    }
+
+    @Test
+    void rejectsHttpEndpointWithoutPathStyleAccess() {
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = downloadBuilder("data.txt")
+            .pathStyleAccess(Property.ofValue(false))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+        assertThat(exception.getMessage(), containsString("https"));
+    }
+
+    @Test
     void rejectsInvalidRegion() {
         var runContext = runContextFactory.of(Map.of());
 
         var task = Download.builder()
-            .id("download")
+            .id(IdUtils.create())
             .type(Download.class.getName())
             .accessKeyId(Property.ofValue("test-id"))
             .accessKeySecret(Property.ofValue("test-secret"))
@@ -250,7 +306,7 @@ class UploadDownloadTest {
 
     private Upload.UploadBuilder<?, ?> uploadBuilder(Property<String> from) {
         return Upload.builder()
-            .id("upload")
+            .id(IdUtils.create())
             .type(Upload.class.getName())
             .accessKeyId(Property.ofValue("test-id"))
             .accessKeySecret(Property.ofValue("test-secret"))
@@ -267,7 +323,7 @@ class UploadDownloadTest {
 
     private Download.DownloadBuilder<?, ?> downloadBuilder(String key) {
         return Download.builder()
-            .id("download")
+            .id(IdUtils.create())
             .type(Download.class.getName())
             .accessKeyId(Property.ofValue("test-id"))
             .accessKeySecret(Property.ofValue("test-secret"))

@@ -1,7 +1,6 @@
 package io.kestra.plugin.alibaba.oss;
 
-import com.aliyun.oss.OSSException;
-import com.aliyun.oss.model.OSSObject;
+import com.aliyun.oss.ClientException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -17,7 +16,6 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
@@ -68,26 +66,25 @@ public class Download extends AbstractOss implements RunnableTask<Download.Outpu
         var rKey = required(runContext, this.key, "key");
 
         try (var client = client(runContext)) {
-            OSSObject object;
             try {
-                object = client.getOss().getObject(rBucket, rKey);
-            } catch (OSSException e) {
-                throw new IOException("Unable to download oss://" + rBucket + "/" + rKey + " (" + e.getErrorCode() + "): check that the key and bucket exist and that the credentials have read access", e);
+                var object = client.getOss().getObject(rBucket, rKey);
+
+                var tempFile = runContext.workingDir().createTempFile();
+                try (InputStream inputStream = object.getObjectContent()) {
+                    Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+
+                var size = Files.size(tempFile);
+                var uri = runContext.storage().putFile(tempFile.toFile());
+                runContext.logger().debug("Downloaded oss://{}/{} ({} bytes)", rBucket, rKey, size);
+
+                return Output.builder()
+                    .uri(uri)
+                    .size(size)
+                    .build();
+            } catch (ClientException e) {
+                throw translate(e, "download", "oss://" + rBucket + "/" + rKey, "read");
             }
-
-            var tempFile = runContext.workingDir().createTempFile();
-            try (InputStream inputStream = object.getObjectContent()) {
-                Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-            }
-
-            var size = Files.size(tempFile);
-            var uri = runContext.storage().putFile(tempFile.toFile());
-            runContext.logger().debug("Downloaded oss://{}/{} ({} bytes)", rBucket, rKey, size);
-
-            return Output.builder()
-                .uri(uri)
-                .size(size)
-                .build();
         }
     }
 

@@ -95,7 +95,6 @@ dependencies {
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
 
-    // mock OSS endpoint, no cloud credentials needed in CI
     testImplementation "org.wiremock:wiremock-jetty12"
 }
 

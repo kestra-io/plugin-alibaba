@@ -1,8 +1,10 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientBuilderConfiguration;
+import com.aliyun.oss.ClientException;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
+import com.aliyun.oss.OSSException;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
@@ -17,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.regex.Pattern;
 
@@ -62,8 +65,14 @@ public abstract class AbstractOss extends AbstractConnection {
                 throw new IllegalArgumentException("`region` must only contain lowercase letters, digits and dashes, got: " + regionId);
             }
             endpoint = "https://oss-" + regionId + ".aliyuncs.com";
-        } else {
-            validateEndpoint(endpoint);
+        }
+
+        var pathStyle = runContext.render(this.pathStyleAccess).as(Boolean.class).orElse(false);
+        if (runContext.render(this.endpointOverride).as(String.class).isPresent()) {
+            validateEndpoint(endpoint, pathStyle);
+            if (endpoint.startsWith("http://")) {
+                runContext.logger().warn("`endpointOverride` uses plain http, credentials and data are sent unencrypted");
+            }
         }
 
         var id = required(runContext, this.accessKeyId, "accessKeyId");
@@ -71,12 +80,26 @@ public abstract class AbstractOss extends AbstractConnection {
         var token = runContext.render(this.securityToken).as(String.class).orElse(null);
 
         var configuration = new ClientBuilderConfiguration();
-        configuration.setSLDEnabled(runContext.render(this.pathStyleAccess).as(Boolean.class).orElse(false));
+        configuration.setSLDEnabled(pathStyle);
 
         return new Client(new OSSClientBuilder().build(endpoint, id, secret, token, configuration));
     }
 
-    private static void validateEndpoint(String endpoint) {
+    protected static IOException translate(ClientException e, String operation, String target, String access) {
+        if (e instanceof OSSException ossException) {
+            return new IOException(
+                "Unable to " + operation + " " + target + " (" + ossException.getErrorCode() + "): check that the bucket and key exist and that the credentials have " + access + " access",
+                e
+            );
+        }
+
+        return new IOException(
+            "Unable to " + operation + " " + target + ": check `region` or `endpointOverride` and network access to the OSS endpoint (" + e.getMessage() + ")",
+            e
+        );
+    }
+
+    private static void validateEndpoint(String endpoint, boolean pathStyle) {
         URI uri;
         try {
             uri = URI.create(endpoint);
@@ -87,6 +110,10 @@ public abstract class AbstractOss extends AbstractConnection {
         var scheme = uri.getScheme();
         if (uri.getHost() == null || scheme == null || !(scheme.equals("http") || scheme.equals("https"))) {
             throw new IllegalArgumentException("`endpointOverride` must be an http or https URL, got: " + endpoint);
+        }
+
+        if (scheme.equals("http") && !pathStyle) {
+            throw new IllegalArgumentException("`endpointOverride` must use https unless `pathStyleAccess` is true, got: " + endpoint);
         }
     }
 

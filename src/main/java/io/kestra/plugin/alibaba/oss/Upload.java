@@ -1,5 +1,6 @@
 package io.kestra.plugin.alibaba.oss;
 
+import com.aliyun.oss.ClientException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -92,13 +93,17 @@ public class Upload extends AbstractOss implements RunnableTask<Upload.Output> {
 
         try (var client = client(runContext)) {
             var file = tempFile.toFile();
-            var result = client.getOss().putObject(rBucket, rKey, file);
-            runContext.logger().debug("Uploaded {} bytes to oss://{}/{}", file.length(), rBucket, rKey);
+            try {
+                var result = client.getOss().putObject(rBucket, rKey, file);
+                runContext.logger().debug("Uploaded {} bytes to oss://{}/{}", file.length(), rBucket, rKey);
 
-            return Output.builder()
-                .etag(result.getETag())
-                .key(rKey)
-                .build();
+                return Output.builder()
+                    .etag(result.getETag())
+                    .key(rKey)
+                    .build();
+            } catch (ClientException e) {
+                throw translate(e, "upload to", "oss://" + rBucket + "/" + rKey, "write");
+            }
         }
     }
 
