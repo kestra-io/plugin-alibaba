@@ -85,7 +85,7 @@ public abstract class AbstractOss extends AbstractConnection {
         return new Client(new OSSClientBuilder().build(endpoint, id, secret, token, configuration));
     }
 
-    protected static IOException translate(ClientException e, String operation, String target, String access) {
+    protected static IOException translate(RuntimeException e, String operation, String target, String access) {
         if (e instanceof OSSException ossException) {
             return new IOException(
                 "Unable to " + operation + " " + target + " (" + ossException.getErrorCode() + "): check that the bucket and key exist and that the credentials have " + access + " access",

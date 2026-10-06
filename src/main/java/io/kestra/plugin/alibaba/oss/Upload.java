@@ -1,6 +1,7 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientException;
+import com.aliyun.oss.OSSException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -101,7 +102,7 @@ public class Upload extends AbstractOss implements RunnableTask<Upload.Output> {
                     .etag(result.getETag())
                     .key(rKey)
                     .build();
-            } catch (ClientException e) {
+            } catch (OSSException | ClientException e) {
                 throw translate(e, "upload to", "oss://" + rBucket + "/" + rKey, "write");
             }
         }

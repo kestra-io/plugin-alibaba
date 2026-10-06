@@ -1,6 +1,7 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientException;
+import com.aliyun.oss.OSSException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -82,7 +83,7 @@ public class Download extends AbstractOss implements RunnableTask<Download.Outpu
                     .uri(uri)
                     .size(size)
                     .build();
-            } catch (ClientException e) {
+            } catch (OSSException | ClientException e) {
                 throw translate(e, "download", "oss://" + rBucket + "/" + rKey, "read");
             }
         }
