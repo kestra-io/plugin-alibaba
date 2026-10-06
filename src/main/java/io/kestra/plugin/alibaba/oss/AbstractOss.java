@@ -1,7 +1,6 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientBuilderConfiguration;
-import com.aliyun.oss.ClientException;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.OSSException;
