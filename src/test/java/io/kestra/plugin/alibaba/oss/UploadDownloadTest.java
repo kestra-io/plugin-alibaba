@@ -253,7 +253,7 @@ class UploadDownloadTest {
 
         var exception = assertThrows(IOException.class, () -> task.run(runContext));
         assertThat(exception.getMessage(), containsString("endpointOverride"));
-        assertThat(exception.getMessage(), not(containsString("127.0.0.1:1/")));
+        assertThat(exception.getMessage(), not(containsString("http://")));
     }
 
     @Test

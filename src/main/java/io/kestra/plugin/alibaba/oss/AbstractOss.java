@@ -20,6 +20,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 @SuperBuilder
@@ -111,7 +112,7 @@ public abstract class AbstractOss extends AbstractConnection {
             throw new IllegalArgumentException("`endpointOverride` is not a valid URL: " + endpoint, e);
         }
 
-        var scheme = uri.getScheme() == null ? null : uri.getScheme().toLowerCase();
+        var scheme = uri.getScheme() == null ? null : uri.getScheme().toLowerCase(Locale.ROOT);
         if (uri.getHost() == null || scheme == null || !(scheme.equals("http") || scheme.equals("https"))) {
             throw new IllegalArgumentException("`endpointOverride` must be an http or https URL, got: " + endpoint);
         }
