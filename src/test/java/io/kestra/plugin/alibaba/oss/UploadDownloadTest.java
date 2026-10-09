@@ -28,6 +28,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -252,6 +253,7 @@ class UploadDownloadTest {
 
         var exception = assertThrows(IOException.class, () -> task.run(runContext));
         assertThat(exception.getMessage(), containsString("endpointOverride"));
+        assertThat(exception.getMessage(), not(containsString("127.0.0.1:1/")));
     }
 
     @Test

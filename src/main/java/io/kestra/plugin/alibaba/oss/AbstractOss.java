@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractOss extends AbstractConnection {
+    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE);
     private static final Pattern REGION_PATTERN = Pattern.compile("^[a-z0-9-]+$");
 
     @Schema(
@@ -69,7 +70,7 @@ public abstract class AbstractOss extends AbstractConnection {
         var pathStyle = runContext.render(this.pathStyleAccess).as(Boolean.class).orElse(false);
         if (runContext.render(this.endpointOverride).as(String.class).isPresent()) {
             validateEndpoint(endpoint, pathStyle);
-            if (endpoint.startsWith("http://")) {
+            if ("http".equalsIgnoreCase(URI.create(endpoint).getScheme())) {
                 runContext.logger().warn("`endpointOverride` uses plain http, credentials and data are sent unencrypted");
             }
         }
@@ -93,9 +94,13 @@ public abstract class AbstractOss extends AbstractConnection {
         }
 
         return new IOException(
-            "Unable to " + operation + " " + target + ": check `region` or `endpointOverride` and network access to the OSS endpoint (" + e.getMessage() + ")",
+            "Unable to " + operation + " " + target + ": check `region` or `endpointOverride` and network access to the OSS endpoint (" + redactUrls(e.getMessage()) + ")",
             e
         );
+    }
+
+    private static String redactUrls(String message) {
+        return message == null ? "no details" : URL_PATTERN.matcher(message).replaceAll("<url>");
     }
 
     private static void validateEndpoint(String endpoint, boolean pathStyle) {
@@ -106,7 +111,7 @@ public abstract class AbstractOss extends AbstractConnection {
             throw new IllegalArgumentException("`endpointOverride` is not a valid URL: " + endpoint, e);
         }
 
-        var scheme = uri.getScheme();
+        var scheme = uri.getScheme() == null ? null : uri.getScheme().toLowerCase();
         if (uri.getHost() == null || scheme == null || !(scheme.equals("http") || scheme.equals("https"))) {
             throw new IllegalArgumentException("`endpointOverride` must be an http or https URL, got: " + endpoint);
         }
