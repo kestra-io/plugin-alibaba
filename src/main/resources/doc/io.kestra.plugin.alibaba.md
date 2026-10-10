@@ -42,3 +42,36 @@ Downloads an object into Kestra internal storage.
 - Required: `bucket`, `key`.
 - Optional: `pathStyleAccess`.
 - Outputs: `uri`, `size`.
+
+### `io.kestra.plugin.alibaba.oss.List`
+
+Lists the objects of a bucket. Folder placeholder keys (ending with `/`) are skipped.
+
+- Required: `bucket`.
+- Optional: `prefix`, `delimiter`, `regexp` (the whole key must match), `maxFiles` (default 25, a warning is logged when more objects match), `pathStyleAccess`.
+- Outputs: `objects` with `key`, `size`, `etag`, `lastModified`, `storageClass`.
+
+### `io.kestra.plugin.alibaba.oss.Delete`
+
+Deletes an object. OSS reports success for a missing key.
+
+- Required: `bucket`, `key`.
+- Optional: `pathStyleAccess`.
+- Outputs: `key`.
+
+### `io.kestra.plugin.alibaba.oss.Copy`
+
+Copies an object in a single request, so it is limited to objects smaller than 1 GB.
+
+- Required: `bucket`, `key`, `destinationKey`.
+- Optional: `destinationBucket` (defaults to `bucket`), `delete` (delete the source afterwards, which moves the object), `pathStyleAccess`.
+- Outputs: `bucket`, `key`, `etag`.
+
+### `io.kestra.plugin.alibaba.oss.Trigger`
+
+Polls a bucket every `interval` (default 60 seconds), downloads up to `maxFiles` matching objects into Kestra internal storage and starts one execution with all of them. Each object is then deleted or moved so it is not picked up again. If that action fails, the objects are processed again on the next poll.
+
+- Required: `bucket`, `action` (`DELETE` or `MOVE`).
+- Required for `MOVE`: `moveToPrefix`, prepended to the original key. Keep it outside the polled `prefix`. `moveToBucket` defaults to `bucket`.
+- Optional: `prefix`, `regexp`, `maxFiles`, `interval`, `pathStyleAccess`.
+- Outputs: `objects` with `key`, `size`, `etag`, `lastModified` and `uri` (the downloaded file in internal storage).
