@@ -40,7 +40,7 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
-- Includes the OSS tasks `Upload` and `Download` for moving files between Kestra internal storage and Alibaba Cloud Object Storage Service buckets.
+- Includes the OSS tasks `Upload`, `Download`, `List`, `Delete` and `Copy`, and a `Trigger` that starts a flow when objects appear in a bucket.
 
 ## Usage
 

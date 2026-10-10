@@ -3,7 +3,7 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
-- Includes classes such as `Upload`, `Download`.
+- Includes classes such as `Upload`, `Download`, `List`, `Delete`, `Copy`, `Trigger`.
 
 ## Why
 
@@ -26,6 +26,10 @@ Tests run against a WireMock server standing in for the OSS endpoint, so no clou
 
 - `io.kestra.plugin.alibaba.oss.Upload`
 - `io.kestra.plugin.alibaba.oss.Download`
+- `io.kestra.plugin.alibaba.oss.List`
+- `io.kestra.plugin.alibaba.oss.Delete`
+- `io.kestra.plugin.alibaba.oss.Copy`
+- `io.kestra.plugin.alibaba.oss.Trigger`
 
 ### Project Structure
 
