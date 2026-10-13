@@ -48,7 +48,7 @@ Downloads an object into Kestra internal storage.
 Lists the objects of a bucket. Folder placeholder keys (ending with `/`) are skipped.
 
 - Required: `bucket`.
-- Optional: `prefix`, `delimiter`, `regexp` (the whole key must match), `maxFiles` (default 25, a warning is logged when more objects match), `pathStyleAccess`.
+- Optional: `prefix`, `delimiter`, `regexp` (the whole key must match, at most 256 characters, evaluation is time-boxed), `maxFiles` (1 to 1000, default 25, a warning is logged when more objects match), `pathStyleAccess`.
 - Outputs: `objects` with `key`, `size`, `etag`, `lastModified`, `storageClass`.
 
 ### `io.kestra.plugin.alibaba.oss.Delete`
@@ -61,7 +61,7 @@ Deletes an object. OSS reports success for a missing key.
 
 ### `io.kestra.plugin.alibaba.oss.Copy`
 
-Copies an object in a single request, so it is limited to objects smaller than 1 GB.
+Copies an object in a single request, so it is limited to objects of at most 1 GB, which is checked before copying. If the source cannot be deleted after a successful copy, the task fails and says the copy exists.
 
 - Required: `bucket`, `key`, `destinationKey`.
 - Optional: `destinationBucket` (defaults to `bucket`), `delete` (delete the source afterwards, which moves the object), `pathStyleAccess`.
@@ -69,9 +69,9 @@ Copies an object in a single request, so it is limited to objects smaller than 1
 
 ### `io.kestra.plugin.alibaba.oss.Trigger`
 
-Polls a bucket every `interval` (default 60 seconds), downloads up to `maxFiles` matching objects into Kestra internal storage and starts one execution with all of them. Each object is then deleted or moved so it is not picked up again. If that action fails, the objects are processed again on the next poll.
+Polls a bucket every `interval` (default 60 seconds), downloads up to `maxFiles` matching objects into Kestra internal storage and starts one execution with all of them. Objects are downloaded first, then each is deleted or moved so it is not picked up again. The execution starts even if the delete or move of some objects fails, and those objects are reported again by the next poll. An object that cannot be downloaded is left in place.
 
 - Required: `bucket`, `action` (`DELETE` or `MOVE`).
-- Required for `MOVE`: `moveToPrefix`, prepended to the original key. Keep it outside the polled `prefix`. `moveToBucket` defaults to `bucket`.
+- Required for `MOVE`: `moveToPrefix`, prepended to the original key. The task fails when a moved key in the same bucket would still match `prefix` and `regexp`. `moveToBucket` defaults to `bucket`.
 - Optional: `prefix`, `regexp`, `maxFiles`, `interval`, `pathStyleAccess`.
-- Outputs: `objects` with `key`, `size`, `etag`, `lastModified` and `uri` (the downloaded file in internal storage).
+- Outputs: `objects` with `key`, `size`, `etag`, `lastModified`, `uri` (the downloaded file in internal storage) and `actionFailed` (true when the delete or move failed and the object is still in the bucket).

@@ -21,6 +21,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.head;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.put;
@@ -162,6 +163,7 @@ class ListDeleteCopyTest {
 
     @Test
     void copy() throws Exception {
+        stubHead("/my-bucket/landing/data.txt", 3);
         stubCopy("/my-bucket/archive/data.txt");
 
         var output = copy("archive/data.txt").build().run(runContextFactory.of(Map.of()));
@@ -175,6 +177,7 @@ class ListDeleteCopyTest {
 
     @Test
     void copyWithDeleteMovesTheObject() throws Exception {
+        stubHead("/my-bucket/landing/data.txt", 3);
         stubCopy("/other-bucket/archive/data.txt");
         wireMock.stubFor(WireMock.delete(urlEqualTo("/my-bucket/landing/data.txt"))
             .willReturn(aResponse().withStatus(204)));
@@ -199,14 +202,73 @@ class ListDeleteCopyTest {
 
     @Test
     void copyFailsWhenSourceIsMissing() {
-        wireMock.stubFor(put(urlEqualTo("/my-bucket/archive/data.txt"))
-            .willReturn(aResponse().withStatus(404).withBody(error("NoSuchKey", "The specified key does not exist."))));
+        stubHead("/my-bucket/landing/data.txt", 3);
+        wireMock.stubFor(head(urlEqualTo("/my-bucket/landing/data.txt")).willReturn(aResponse().withStatus(404)));
 
         var task = copy("archive/data.txt").build();
 
         var exception = assertThrows(IOException.class, () -> task.run(runContextFactory.of(Map.of())));
-        assertThat(exception.getMessage(), containsString("NoSuchKey"));
         assertThat(exception.getMessage(), containsString("oss://my-bucket/landing/data.txt"));
+        wireMock.verify(0, putRequestedFor(urlEqualTo("/my-bucket/archive/data.txt")));
+    }
+
+    @Test
+    void copyRejectsObjectsOverOneGigabyte() {
+        stubHead("/my-bucket/landing/data.txt", 2L * 1024 * 1024 * 1024);
+
+        var task = copy("archive/data.txt").build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of(Map.of())));
+        assertThat(exception.getMessage(), containsString("1 GB"));
+        wireMock.verify(0, putRequestedFor(urlEqualTo("/my-bucket/archive/data.txt")));
+    }
+
+    @Test
+    void copyReportsFailedSourceDeletionSeparately() {
+        stubHead("/my-bucket/landing/data.txt", 3);
+        stubCopy("/my-bucket/archive/data.txt");
+        wireMock.stubFor(WireMock.delete(urlEqualTo("/my-bucket/landing/data.txt"))
+            .willReturn(aResponse().withStatus(403).withBody(error("AccessDenied", "You have no right to access this object."))));
+
+        var task = copy("archive/data.txt").delete(Property.ofValue(true)).build();
+
+        var exception = assertThrows(IOException.class, () -> task.run(runContextFactory.of(Map.of())));
+        assertThat(exception.getMessage(), containsString("was copied to oss://my-bucket/archive/data.txt"));
+        assertThat(exception.getMessage(), containsString("kept"));
+    }
+
+    @Test
+    void listRejectsMaxFilesAboveLimit() {
+        var task = list().maxFiles(Property.ofValue(1001)).build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of(Map.of())));
+        assertThat(exception.getMessage(), containsString("between 1 and 1000"));
+    }
+
+    @Test
+    void listRejectsTooLongRegexp() {
+        var task = list().regexp(Property.ofValue("a".repeat(257))).build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of(Map.of())));
+        assertThat(exception.getMessage(), containsString("regexp"));
+    }
+
+    @Test
+    void listRejectsInvalidRegexp() {
+        var task = list().regexp(Property.ofValue("(unclosed")).build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of(Map.of())));
+        assertThat(exception.getMessage(), containsString("not a valid regular expression"));
+    }
+
+    @Test
+    void listStopsCatastrophicBacktracking() {
+        stubList(false, null, object("a".repeat(40) + "!", 1));
+
+        var task = list().regexp(Property.ofValue("(a+)+$")).build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of(Map.of())));
+        assertThat(exception.getMessage(), containsString("took too long"));
     }
 
     private static String endpoint() {
@@ -232,6 +294,14 @@ class ListDeleteCopyTest {
     private void stubList(boolean truncated, String nextToken, String... objects) {
         wireMock.stubFor(get(urlPathMatching("/my-bucket/?"))
             .willReturn(aResponse().withStatus(200).withBody(listBody(truncated, nextToken, objects))));
+    }
+
+    private void stubHead(String path, long size) {
+        wireMock.stubFor(head(urlEqualTo(path))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Length", String.valueOf(size))
+                .withHeader("ETag", "\"head-etag\"")
+                .withHeader("Last-Modified", "Sat, 10 Oct 2026 08:00:00 GMT")));
     }
 
     private void stubCopy(String path) {

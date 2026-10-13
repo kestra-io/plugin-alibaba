@@ -33,7 +33,7 @@ import java.util.Optional;
 @NoArgsConstructor
 @Schema(
     title = "Trigger a flow when objects appear in an OSS bucket",
-    description = "Polls a bucket on a fixed interval, downloads the matching objects into Kestra internal storage and starts one execution with all of them. Each processed object is then deleted or moved so that it is not picked up again: if the action fails, the objects are processed again on the next poll."
+    description = "Polls a bucket on a fixed interval, downloads the matching objects into Kestra internal storage and starts one execution with all of them. Each downloaded object is then deleted or moved so that it is not picked up again. Objects are downloaded first, and the execution is started even if the delete or move of some of them fails: those objects are reported again by the next poll. An object that cannot be downloaded is left in place and skipped."
 )
 @Plugin(
     examples = {
@@ -71,6 +71,7 @@ import java.util.Optional;
 )
 public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<Trigger.Output> {
     @Schema(title = "Polling interval")
+    @PluginProperty(group = "execution")
     @Builder.Default
     private final Duration interval = Duration.ofSeconds(60);
 
@@ -119,7 +120,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @PluginProperty(group = "advanced")
     private Property<String> regexp;
 
-    @Schema(title = "Maximum number of files", description = "Maximum number of objects processed per poll. The rest is picked up by the next polls.")
+    @Schema(title = "Maximum number of files", description = "Maximum number of objects processed per poll, between 1 and 1000. The rest is picked up by the next polls.")
     @PluginProperty(group = "advanced")
     @Builder.Default
     private Property<Integer> maxFiles = Property.ofValue(25);
@@ -141,7 +142,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
 
     @Schema(
         title = "Move destination prefix",
-        description = "Prefix prepended to the original key when `action` is `MOVE`. Required for `MOVE`. Keep it outside the polled `prefix`, otherwise moved objects are picked up again."
+        description = "Prefix prepended to the original key when `action` is `MOVE`. Required for `MOVE`. The task fails when a moved key in the same bucket would still match `prefix` and `regexp`, because such objects would be picked up again."
     )
     @PluginProperty(group = "destination")
     private Property<String> moveToPrefix;
@@ -149,6 +150,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         var runContext = conditionContext.getRunContext();
+        var logger = runContext.logger();
 
         var rAction = runContext.render(this.action).as(Action.class)
             .orElseThrow(() -> new IllegalArgumentException("`action` is required"));
@@ -158,6 +160,8 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             rMoveToPrefix = AbstractOss.required(runContext, this.moveToPrefix, "moveToPrefix");
         }
         var rMoveToBucket = runContext.render(this.moveToBucket).as(String.class).orElse(rBucket);
+        var rPrefix = runContext.render(this.prefix).as(String.class).orElse(null);
+        var rRegexp = runContext.render(this.regexp).as(String.class).map(OssRegexp::compile).orElse(null);
 
         var listed = List.builder()
             .id(this.getId())
@@ -179,26 +183,22 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             return Optional.empty();
         }
 
-        var triggered = new ArrayList<TriggeredObject>();
-        for (var object : listed.getObjects()) {
-            var downloaded = Download.builder()
-                .id(this.getId())
-                .type(Download.class.getName())
-                .accessKeyId(this.accessKeyId)
-                .accessKeySecret(this.accessKeySecret)
-                .securityToken(this.securityToken)
-                .region(this.region)
-                .endpointOverride(this.endpointOverride)
-                .pathStyleAccess(this.pathStyleAccess)
-                .bucket(this.bucket)
-                .key(Property.ofValue(object.getKey()))
-                .build()
-                .run(runContext);
+        if (rAction == Action.MOVE && rMoveToBucket.equals(rBucket)) {
+            for (var object : listed.getObjects()) {
+                var destination = rMoveToPrefix + object.getKey();
+                if ((rPrefix == null || destination.startsWith(rPrefix)) && (rRegexp == null || OssRegexp.matches(rRegexp, destination))) {
+                    throw new IllegalArgumentException("`moveToPrefix` must lead outside the polled objects, otherwise moved objects are picked up again: oss://" + rBucket + "/" + destination + " still matches `prefix` and `regexp`");
+                }
+            }
+        }
 
-            if (rAction == Action.DELETE) {
-                Delete.builder()
+        var downloaded = new ArrayList<Downloaded>();
+        var failures = new ArrayList<Exception>();
+        for (var object : listed.getObjects()) {
+            try {
+                var result = Download.builder()
                     .id(this.getId())
-                    .type(Delete.class.getName())
+                    .type(Download.class.getName())
                     .accessKeyId(this.accessKeyId)
                     .accessKeySecret(this.accessKeySecret)
                     .securityToken(this.securityToken)
@@ -209,41 +209,79 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
                     .key(Property.ofValue(object.getKey()))
                     .build()
                     .run(runContext);
-            } else {
-                Copy.builder()
-                    .id(this.getId())
-                    .type(Copy.class.getName())
-                    .accessKeyId(this.accessKeyId)
-                    .accessKeySecret(this.accessKeySecret)
-                    .securityToken(this.securityToken)
-                    .region(this.region)
-                    .endpointOverride(this.endpointOverride)
-                    .pathStyleAccess(this.pathStyleAccess)
-                    .bucket(this.bucket)
-                    .key(Property.ofValue(object.getKey()))
-                    .destinationBucket(Property.ofValue(rMoveToBucket))
-                    .destinationKey(Property.ofValue(rMoveToPrefix + object.getKey()))
-                    .delete(Property.ofValue(true))
-                    .build()
-                    .run(runContext);
+                downloaded.add(new Downloaded(object, result.getUri()));
+            } catch (Exception e) {
+                logger.error("Unable to download oss://{}/{}, it is left in place: {}", rBucket, object.getKey(), e.getMessage());
+                failures.add(e);
+            }
+        }
+
+        if (downloaded.isEmpty()) {
+            throw failures.get(0);
+        }
+
+        var triggered = new ArrayList<TriggeredObject>();
+        for (var item : downloaded) {
+            var key = item.object().getKey();
+            var actionFailed = false;
+            try {
+                if (rAction == Action.DELETE) {
+                    Delete.builder()
+                        .id(this.getId())
+                        .type(Delete.class.getName())
+                        .accessKeyId(this.accessKeyId)
+                        .accessKeySecret(this.accessKeySecret)
+                        .securityToken(this.securityToken)
+                        .region(this.region)
+                        .endpointOverride(this.endpointOverride)
+                        .pathStyleAccess(this.pathStyleAccess)
+                        .bucket(this.bucket)
+                        .key(Property.ofValue(key))
+                        .build()
+                        .run(runContext);
+                } else {
+                    Copy.builder()
+                        .id(this.getId())
+                        .type(Copy.class.getName())
+                        .accessKeyId(this.accessKeyId)
+                        .accessKeySecret(this.accessKeySecret)
+                        .securityToken(this.securityToken)
+                        .region(this.region)
+                        .endpointOverride(this.endpointOverride)
+                        .pathStyleAccess(this.pathStyleAccess)
+                        .bucket(this.bucket)
+                        .key(Property.ofValue(key))
+                        .destinationBucket(Property.ofValue(rMoveToBucket))
+                        .destinationKey(Property.ofValue(rMoveToPrefix + key))
+                        .delete(Property.ofValue(true))
+                        .build()
+                        .run(runContext);
+                }
+            } catch (Exception e) {
+                actionFailed = true;
+                logger.error("Unable to {} oss://{}/{}, it will be picked up again by the next poll: {}", rAction, rBucket, key, e.getMessage());
             }
 
             triggered.add(TriggeredObject.builder()
-                .key(object.getKey())
-                .size(object.getSize())
-                .etag(object.getEtag())
-                .lastModified(object.getLastModified())
-                .uri(downloaded.getUri())
+                .key(key)
+                .size(item.object().getSize())
+                .etag(item.object().getEtag())
+                .lastModified(item.object().getLastModified())
+                .uri(item.uri())
+                .actionFailed(actionFailed)
                 .build());
         }
 
-        runContext.logger().info("Found {} objects in oss://{}", triggered.size(), rBucket);
+        logger.info("Found {} objects in oss://{}", triggered.size(), rBucket);
 
         var output = Output.builder()
             .objects(triggered)
             .build();
 
         return Optional.of(TriggerService.generateExecution(this, conditionContext, context, output));
+    }
+
+    private record Downloaded(OssObject object, URI uri) {
     }
 
     public enum Action {
@@ -268,6 +306,12 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
 
         @Schema(title = "URI of the downloaded object in Kestra internal storage")
         private final URI uri;
+
+        @Schema(
+            title = "Whether the delete or move failed",
+            description = "When true, the object is still in the bucket and is reported again by the next poll."
+        )
+        private final Boolean actionFailed;
     }
 
     @Builder

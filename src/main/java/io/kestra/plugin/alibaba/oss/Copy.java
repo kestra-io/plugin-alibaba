@@ -17,6 +17,8 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+import java.io.IOException;
+
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
@@ -24,7 +26,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Copy an object within OSS",
-    description = "Copies an object to another key, optionally in another bucket of the same region and account, and can delete the source afterwards to move it. The copy is a single request, so it is limited to objects smaller than 1 GB."
+    description = "Copies an object to another key, optionally in another bucket of the same region and account, and can delete the source afterwards to move it. The copy is a single request, so it is limited to objects of at most 1 GB, which is checked before copying. If the source cannot be deleted after a successful copy, the task fails with a message saying the copy exists."
 )
 @Plugin(
     examples = {
@@ -50,6 +52,8 @@ import lombok.experimental.SuperBuilder;
     }
 )
 public class Copy extends AbstractOss implements RunnableTask<Copy.Output> {
+    private static final long MAX_COPY_SIZE = 1024L * 1024L * 1024L;
+
     @Schema(
         title = "Source object key",
         description = "The key of the object to copy, in `bucket`."
@@ -97,23 +101,35 @@ public class Copy extends AbstractOss implements RunnableTask<Copy.Output> {
         var destination = "oss://" + rDestinationBucket + "/" + rDestinationKey;
 
         try (var client = client(runContext)) {
-            try {
-                var result = client.getOss().copyObject(rBucket, rKey, rDestinationBucket, rDestinationKey);
-                runContext.logger().debug("Copied {} to {}", source, destination);
+            var oss = client.getOss();
 
-                if (rDelete) {
-                    client.getOss().deleteObject(rBucket, rKey);
-                    runContext.logger().debug("Deleted {}", source);
+            com.aliyun.oss.model.CopyObjectResult result;
+            try {
+                var size = oss.getObjectMetadata(rBucket, rKey).getContentLength();
+                if (size > MAX_COPY_SIZE) {
+                    throw new IllegalArgumentException("Unable to copy " + source + ": it is " + size + " bytes and a single-request copy is limited to 1 GB (" + MAX_COPY_SIZE + " bytes)");
                 }
 
-                return Output.builder()
-                    .bucket(rDestinationBucket)
-                    .key(rDestinationKey)
-                    .etag(result.getETag())
-                    .build();
+                result = oss.copyObject(rBucket, rKey, rDestinationBucket, rDestinationKey);
+                runContext.logger().debug("Copied {} to {}", source, destination);
             } catch (OSSException | ClientException e) {
                 throw translate(e, "copy", source + " to " + destination, "read and write");
             }
+
+            if (rDelete) {
+                try {
+                    oss.deleteObject(rBucket, rKey);
+                    runContext.logger().debug("Deleted {}", source);
+                } catch (OSSException | ClientException e) {
+                    throw new IOException("The object was copied to " + destination + " but the source " + source + " could not be deleted and was kept: " + translate(e, "delete", source, "write").getMessage(), e);
+                }
+            }
+
+            return Output.builder()
+                .bucket(rDestinationBucket)
+                .key(rDestinationKey)
+                .etag(result.getETag())
+                .build();
         }
     }
 

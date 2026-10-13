@@ -18,7 +18,6 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.util.ArrayList;
-import java.util.regex.Pattern;
 
 @SuperBuilder
 @ToString
@@ -53,6 +52,7 @@ import java.util.regex.Pattern;
 )
 public class List extends AbstractOss implements RunnableTask<List.Output> {
     private static final int PAGE_SIZE = 1000;
+    private static final int MAX_FILES_LIMIT = 1000;
 
     @Schema(
         title = "Prefix",
@@ -70,14 +70,14 @@ public class List extends AbstractOss implements RunnableTask<List.Output> {
 
     @Schema(
         title = "Regular expression",
-        description = "Only objects whose full key matches this regular expression are returned."
+        description = "Only objects whose full key matches this Java regular expression are returned. It is limited to 256 characters and evaluation is time-boxed to guard against catastrophic backtracking."
     )
     @PluginProperty(group = "advanced")
     private Property<String> regexp;
 
     @Schema(
         title = "Maximum number of files",
-        description = "Maximum number of objects returned. A warning is logged when more objects match."
+        description = "Maximum number of objects returned, between 1 and 1000 (default 25). A warning is logged when more objects match."
     )
     @PluginProperty(group = "advanced")
     @Builder.Default
@@ -88,10 +88,10 @@ public class List extends AbstractOss implements RunnableTask<List.Output> {
         var rBucket = rBucket(runContext);
         var rPrefix = runContext.render(this.prefix).as(String.class).orElse(null);
         var rDelimiter = runContext.render(this.delimiter).as(String.class).orElse(null);
-        var rRegexp = runContext.render(this.regexp).as(String.class).map(Pattern::compile).orElse(null);
+        var rRegexp = runContext.render(this.regexp).as(String.class).map(OssRegexp::compile).orElse(null);
         var rMaxFiles = runContext.render(this.maxFiles).as(Integer.class).orElse(25);
-        if (rMaxFiles < 1) {
-            throw new IllegalArgumentException("`maxFiles` must be at least 1, got: " + rMaxFiles);
+        if (rMaxFiles < 1 || rMaxFiles > MAX_FILES_LIMIT) {
+            throw new IllegalArgumentException("`maxFiles` must be between 1 and " + MAX_FILES_LIMIT + ", got: " + rMaxFiles);
         }
 
         var objects = new ArrayList<OssObject>();
@@ -109,7 +109,7 @@ public class List extends AbstractOss implements RunnableTask<List.Output> {
                     var result = client.getOss().listObjectsV2(request);
                     for (var summary : result.getObjectSummaries()) {
                         var key = summary.getKey();
-                        if (key.endsWith("/") || (rRegexp != null && !rRegexp.matcher(key).matches())) {
+                        if (key.endsWith("/") || (rRegexp != null && !OssRegexp.matches(rRegexp, key))) {
                             continue;
                         }
                         if (objects.size() >= rMaxFiles) {
