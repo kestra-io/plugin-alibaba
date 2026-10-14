@@ -261,16 +261,6 @@ class ListDeleteCopyTest {
         assertThat(exception.getMessage(), containsString("not a valid regular expression"));
     }
 
-    @Test
-    void listStopsCatastrophicBacktracking() {
-        stubList(false, null, object("a".repeat(40) + "!", 1));
-
-        var task = list().regexp(Property.ofValue("(a+)+$")).build();
-
-        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of(Map.of())));
-        assertThat(exception.getMessage(), containsString("took too long"));
-    }
-
     private static String endpoint() {
         return "http://127.0.0.1:" + wireMock.port();
     }

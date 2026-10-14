@@ -23,7 +23,11 @@ final class OssRegexp {
     }
 
     static boolean matches(Pattern pattern, String key) {
-        return pattern.matcher(new Bounded(key, System.nanoTime() + TIMEOUT_NANOS)).matches();
+        return matches(pattern, key, TIMEOUT_NANOS);
+    }
+
+    static boolean matches(Pattern pattern, String key, long timeoutNanos) {
+        return pattern.matcher(new Bounded(key, System.nanoTime() + timeoutNanos)).matches();
     }
 
     private record Bounded(CharSequence delegate, long deadline) implements CharSequence {
