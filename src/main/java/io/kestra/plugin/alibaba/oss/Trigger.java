@@ -217,7 +217,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         }
 
         if (downloaded.isEmpty()) {
-            throw failures.get(0);
+            throw failures.getFirst();
         }
 
         var triggered = new ArrayList<TriggeredObject>();

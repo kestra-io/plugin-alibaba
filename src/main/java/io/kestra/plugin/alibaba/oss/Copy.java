@@ -2,6 +2,7 @@ package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientException;
 import com.aliyun.oss.OSSException;
+import com.aliyun.oss.model.CopyObjectResult;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -103,7 +104,7 @@ public class Copy extends AbstractOss implements RunnableTask<Copy.Output> {
         try (var client = client(runContext)) {
             var oss = client.getOss();
 
-            com.aliyun.oss.model.CopyObjectResult result;
+            CopyObjectResult result;
             try {
                 var size = oss.getObjectMetadata(rBucket, rKey).getContentLength();
                 if (size > MAX_COPY_SIZE) {
