@@ -1,6 +1,6 @@
 # How to use the Alibaba Cloud plugin
 
-This plugin integrates Kestra flows with Alibaba Cloud. It covers OSS file transfers, MaxCompute SQL, and Simple Log Service (SLS) log ingestion, queries, and polling triggers. See the [OSS Java SDK reference](https://www.alibabacloud.com/help/en/oss/developer-reference/oss-java-sdk/) for the underlying API.
+This plugin integrates Kestra flows with Alibaba Cloud. It covers OSS file transfers, MaxCompute SQL, Simple Log Service (SLS) log ingestion, queries, and polling triggers, and Elastic Compute Service (ECS) instances. See the [OSS Java SDK reference](https://www.alibabacloud.com/help/en/oss/developer-reference/oss-java-sdk/) for the underlying API.
 
 ## Authentication
 
@@ -9,7 +9,7 @@ Every task needs an AccessKey pair, and a Security Token Service (STS) token whe
 - `accessKeyId`: the AccessKey ID.
 - `accessKeySecret`: the AccessKey secret.
 - `securityToken`: optional STS token.
-- `region`: the region ID, for example `cn-hangzhou`. Default endpoints are `https://oss-<region>.aliyuncs.com`, `https://service.<region>.maxcompute.aliyun.com/api`, and `https://<region>.log.aliyuncs.com`.
+- `region`: the region ID, for example `cn-hangzhou`. Default endpoints are `https://oss-<region>.aliyuncs.com`, `https://service.<region>.maxcompute.aliyun.com/api`, `https://<region>.log.aliyuncs.com`, and `https://ecs.<region>.aliyuncs.com`. ECS tasks always require `region`.
 - `endpointOverride`: optional URL that replaces the region-derived endpoint. OSS requires https unless `pathStyleAccess` is true. MaxCompute and SLS also accept explicit http URLs for local endpoints. For SLS, specify the full service endpoint, including the project hostname for private endpoints; an explicit port is preserved. Treat it as trusted input, because signed requests and the STS token are sent to it.
 
 Role-based credentials (ECS instance roles and RAM roles) are not supported.
@@ -192,3 +192,38 @@ triggers:
 ```
 
 Both triggers use length-prefixed state keys. State commits and scheduler execution persistence are separate operations, so downstream processing should be idempotent across scheduler crashes; these triggers do not claim transactional exactly-once delivery. Cursor expiry surfaces as an error rather than resetting state and replaying logs.
+
+### `io.kestra.plugin.alibaba.ecs.List`
+
+Lists the instances of a region with the [DescribeInstances](https://www.alibabacloud.com/help/en/ecs/developer-reference/api-ecs-2014-05-26-describeinstances) API, following pagination. Each instance has the API fields, for example `InstanceId`, `InstanceName` and `Status`.
+
+- Required: `region`.
+- Optional: `instanceIds` (up to 100), `status` (`PENDING`, `RUNNING`, `STARTING`, `STOPPING`, `STOPPED`), `instanceName` (supports `*`), `fetchType` (`FETCH` by default, `FETCH_ONE`, `STORE`, `NONE`).
+- Outputs: `rows`, `row`, `uri` or `size` depending on `fetchType`. With `STORE`, each page is written to the file as it arrives.
+
+Each ECS API call waits up to 90% of the task `timeout` (so the plugin error, not the generic Kestra timeout, is shown), or 30 seconds when it is not set. When `Start`, `Stop` or `Reboot` gets no response in time, the request may already have been accepted, so check the instance status before retrying.
+
+### `io.kestra.plugin.alibaba.ecs.Start`
+
+Starts stopped instances. The task returns once the request is accepted, while instances are still `Starting`.
+
+- Required: `region`, `instanceIds` (up to 100).
+- Outputs: `requestId`, `instances` (`instanceId`, `previousStatus`, `currentStatus`).
+
+### `io.kestra.plugin.alibaba.ecs.Stop`
+
+Stops running instances. The task returns once the request is accepted, while instances are still `Stopping`.
+
+- Required: `region`, `instanceIds` (up to 100).
+- Optional: `forceStop` (default `false`), `stoppedMode` (`KEEP_CHARGING` or `STOP_CHARGING`).
+- Outputs: `requestId`, `instances`.
+
+### `io.kestra.plugin.alibaba.ecs.Reboot`
+
+Reboots running instances.
+
+- Required: `region`, `instanceIds` (up to 100).
+- Optional: `forceReboot` (default `false`).
+- Outputs: `requestId`, `instances`.
+
+If one instance of a `Start`, `Stop` or `Reboot` batch is rejected, the task fails and logs which instances were accepted, since the API has already acted on them.
