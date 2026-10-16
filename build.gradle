@@ -63,6 +63,11 @@ dependencies {
     }
 
     implementation "com.aliyun.openservices:aliyun-log:0.6.166"
+    implementation("com.aliyun.mns:aliyun-sdk-mns:2.0.0") {
+        exclude group: "org.json", module: "json"
+        exclude group: "org.jacoco", module: "org.jacoco.agent"
+    }
+    runtimeOnly "com.sun.xml.bind:jaxb-impl:2.3.9"
     implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.2") {
         exclude group: "com.aliyun", module: "aliyun-java-sdk-core"
         exclude group: "com.aliyun", module: "aliyun-java-sdk-ram"
@@ -124,6 +129,7 @@ dependencies {
     testImplementation "org.hamcrest:hamcrest-library"
 
     testImplementation "org.wiremock:wiremock-jetty12"
+    testImplementation "ch.qos.logback:logback-classic"
 }
 
 /**********************************************************************************************************************\

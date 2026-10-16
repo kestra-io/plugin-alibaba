@@ -3,12 +3,12 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
-- Includes OSS `Upload`, `Download`, `List`, `Delete`, `Copy`, and `Trigger`, MaxCompute `Query` and `Trigger`, and SLS `Query`, `Push`, and `Trigger`.
+- Includes OSS `Upload`, `Download`, `List`, `Delete`, `Copy`, and `Trigger`, MaxCompute `Query` and `Trigger`, SLS `Query`, `Push`, and `Trigger`, and MNS `Publish`, `Consume`, `Trigger`, and `RealtimeTrigger`.
 
 ## Why
 
-- This plugin integrates Kestra with Alibaba Cloud OSS, MaxCompute, and Simple Log Service.
-- It moves files through OSS, runs MaxCompute SQL, and queries or ingests SLS logs with typed properties and secret masking. MaxCompute and SLS polling triggers persist typed watermarks or shard cursors in namespace KV.
+- This plugin integrates Kestra with Alibaba Cloud OSS, MaxCompute, Simple Log Service, and Message Service (MNS).
+- It moves files through OSS, runs MaxCompute SQL, and queries or ingests SLS logs with typed properties and secret masking. MaxCompute and SLS polling triggers persist typed watermarks or shard cursors in namespace KV. MNS tasks publish and consume queue messages, and the MNS triggers start flows when messages arrive.
 
 ## How
 
@@ -19,10 +19,11 @@ Single-module plugin. Source packages under `io.kestra.plugin.alibaba`:
 - `oss`
 - `maxcompute`
 - `sls`
+- `mns`
 
-The root package holds the shared connection base (`AlibabaConnectionInterface`, `AbstractConnection`). The `oss` package holds `AbstractOss`, which builds the OSS client, and the tasks.
+The root package holds the shared connection base (`AlibabaConnectionInterface`, `AbstractConnection`). The `oss` package holds `AbstractOss`, which builds the OSS client, and the tasks. The `mns` package holds `AbstractMns`, which builds the MNS client, the `Publish` and `Consume` tasks, and `AbstractMnsTrigger`, shared by `Trigger` and `RealtimeTrigger`.
 
-Tests exercise OSS, MaxCompute instance/result-tunnel APIs, and SLS endpoints through WireMock, so no cloud credentials are needed.
+Tests exercise OSS, MaxCompute instance/result-tunnel APIs, SLS and MNS endpoints through WireMock, so no cloud credentials are needed.
 
 ### Key Plugin Classes
 
@@ -37,6 +38,10 @@ Tests exercise OSS, MaxCompute instance/result-tunnel APIs, and SLS endpoints th
 - `io.kestra.plugin.alibaba.sls.Query`
 - `io.kestra.plugin.alibaba.sls.Push`
 - `io.kestra.plugin.alibaba.sls.Trigger`
+- `io.kestra.plugin.alibaba.mns.Publish`
+- `io.kestra.plugin.alibaba.mns.Consume`
+- `io.kestra.plugin.alibaba.mns.Trigger`
+- `io.kestra.plugin.alibaba.mns.RealtimeTrigger`
 
 ### Project Structure
 

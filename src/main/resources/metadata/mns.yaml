@@ -1,0 +1,8 @@
+group: io.kestra.plugin.alibaba.mns
+name: "mns"
+title: "Alibaba Cloud MNS"
+description: "Publish and consume Alibaba Cloud Message Service (MNS) queue messages"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
