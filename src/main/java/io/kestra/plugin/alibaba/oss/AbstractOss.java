@@ -19,8 +19,6 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.io.IOException;
-import java.net.URI;
-import java.util.Locale;
 import java.util.regex.Pattern;
 
 @SuperBuilder
@@ -30,7 +28,6 @@ import java.util.regex.Pattern;
 @NoArgsConstructor
 public abstract class AbstractOss extends AbstractConnection {
     private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE);
-    private static final Pattern REGION_PATTERN = Pattern.compile("^[a-z0-9-]+$");
 
     @Schema(
         title = "Bucket",
@@ -53,32 +50,21 @@ public abstract class AbstractOss extends AbstractConnection {
     }
 
     protected Client client(RunContext runContext) throws IllegalVariableEvaluationException {
-        var endpoint = runContext.render(this.endpointOverride).as(String.class).orElse(null);
-        if (endpoint == null) {
-            var regionId = runContext.render(this.region).as(String.class)
-                .orElseThrow(() -> new IllegalArgumentException("Either `region` or `endpointOverride` must be set"));
-            if (!REGION_PATTERN.matcher(regionId).matches()) {
-                throw new IllegalArgumentException("`region` must only contain lowercase letters, digits and dashes, got: " + regionId);
-            }
-            endpoint = "https://oss-" + regionId + ".aliyuncs.com";
+        var rPathStyleAccess = runContext.render(this.pathStyleAccess).as(Boolean.class).orElse(false);
+        var rEndpointOverride = rEndpointOverride(runContext, this);
+        if (rEndpointOverride != null && rEndpointOverride.getScheme().equalsIgnoreCase("http") && !rPathStyleAccess) {
+            throw new IllegalArgumentException("`endpointOverride` must use https unless `pathStyleAccess` is true, got: " + rEndpointOverride);
         }
+        var endpoint = rEndpointOverride != null ? rEndpointOverride.toString() : "https://oss-" + rRegion(runContext, this) + ".aliyuncs.com";
 
-        var pathStyle = runContext.render(this.pathStyleAccess).as(Boolean.class).orElse(false);
-        if (runContext.render(this.endpointOverride).as(String.class).isPresent()) {
-            validateEndpoint(endpoint, pathStyle);
-            if ("http".equalsIgnoreCase(URI.create(endpoint).getScheme())) {
-                runContext.logger().warn("`endpointOverride` uses plain http, credentials and data are sent unencrypted");
-            }
-        }
-
-        var id = required(runContext, this.accessKeyId, "accessKeyId");
-        var secret = required(runContext, this.accessKeySecret, "accessKeySecret");
-        var token = runContext.render(this.securityToken).as(String.class).orElse(null);
+        var rAccessKeyId = required(runContext, this.accessKeyId, "accessKeyId");
+        var rAccessKeySecret = required(runContext, this.accessKeySecret, "accessKeySecret");
+        var rSecurityToken = runContext.render(this.securityToken).as(String.class).orElse(null);
 
         var configuration = new ClientBuilderConfiguration();
-        configuration.setSLDEnabled(pathStyle);
+        configuration.setSLDEnabled(rPathStyleAccess);
 
-        return new Client(new OSSClientBuilder().build(endpoint, id, secret, token, configuration));
+        return new Client(new OSSClientBuilder().build(endpoint, rAccessKeyId, rAccessKeySecret, rSecurityToken, configuration));
     }
 
     protected static IOException translate(RuntimeException e, String operation, String target, String access) {
@@ -97,24 +83,6 @@ public abstract class AbstractOss extends AbstractConnection {
 
     private static String redactUrls(String message) {
         return message == null ? "no details" : URL_PATTERN.matcher(message).replaceAll("<url>");
-    }
-
-    private static void validateEndpoint(String endpoint, boolean pathStyle) {
-        URI uri;
-        try {
-            uri = URI.create(endpoint);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("`endpointOverride` is not a valid URL: " + endpoint, e);
-        }
-
-        var scheme = uri.getScheme() == null ? null : uri.getScheme().toLowerCase(Locale.ROOT);
-        if (uri.getHost() == null || scheme == null || !(scheme.equals("http") || scheme.equals("https"))) {
-            throw new IllegalArgumentException("`endpointOverride` must be an http or https URL, got: " + endpoint);
-        }
-
-        if (scheme.equals("http") && !pathStyle) {
-            throw new IllegalArgumentException("`endpointOverride` must use https unless `pathStyleAccess` is true, got: " + endpoint);
-        }
     }
 
     public static final class Client implements AutoCloseable {

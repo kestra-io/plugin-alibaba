@@ -1,7 +1,7 @@
 group: io.kestra.plugin.alibaba
 name: "alibaba"
 title: "Alibaba Cloud"
-description: "Tasks for OSS, MaxCompute, and Simple Log Service, with polling triggers for new rows and logs."
+description: "Tasks for OSS, MaxCompute, Simple Log Service, and Function Compute invocations, with polling triggers for new rows and logs."
 body: ""
 videos: []
 createdBy: "Kestra Core Team"

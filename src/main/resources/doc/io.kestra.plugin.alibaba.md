@@ -1,6 +1,6 @@
 # How to use the Alibaba Cloud plugin
 
-This plugin integrates Kestra flows with Alibaba Cloud. It covers OSS file transfers, MaxCompute SQL, and Simple Log Service (SLS) log ingestion, queries, and polling triggers. See the [OSS Java SDK reference](https://www.alibabacloud.com/help/en/oss/developer-reference/oss-java-sdk/) for the underlying API.
+This plugin integrates Kestra flows with Alibaba Cloud. It covers OSS file transfers, MaxCompute SQL, Simple Log Service (SLS) log ingestion, queries, and polling triggers, and Function Compute (FC) invocations. See the [OSS Java SDK reference](https://www.alibabacloud.com/help/en/oss/developer-reference/oss-java-sdk/) for the underlying API.
 
 ## Authentication
 
@@ -9,7 +9,8 @@ Every task needs an AccessKey pair, and a Security Token Service (STS) token whe
 - `accessKeyId`: the AccessKey ID.
 - `accessKeySecret`: the AccessKey secret.
 - `securityToken`: optional STS token.
-- `region`: the region ID, for example `cn-hangzhou`. Default endpoints are `https://oss-<region>.aliyuncs.com`, `https://service.<region>.maxcompute.aliyun.com/api`, and `https://<region>.log.aliyuncs.com`.
+- `region`: the region ID, for example `cn-hangzhou`. Default endpoints are `https://oss-<region>.aliyuncs.com`, `https://service.<region>.maxcompute.aliyun.com/api`, `https://<region>.log.aliyuncs.com`, and `https://<accountId>.<region>.fc.aliyuncs.com`.
+- `accountId`: your Alibaba Cloud account ID, required by Function Compute unless `endpointOverride` is set.
 - `endpointOverride`: optional URL that replaces the region-derived endpoint. OSS requires https unless `pathStyleAccess` is true. MaxCompute and SLS also accept explicit http URLs for local endpoints. For SLS, specify the full service endpoint, including the project hostname for private endpoints; an explicit port is preserved. Treat it as trusted input, because signed requests and the STS token are sent to it.
 
 Role-based credentials (ECS instance roles and RAM roles) are not supported.
@@ -192,3 +193,12 @@ triggers:
 ```
 
 Both triggers use length-prefixed state keys. State commits and scheduler execution persistence are separate operations, so downstream processing should be idempotent across scheduler crashes; these triggers do not claim transactional exactly-once delivery. Cursor expiry surfaces as an error rather than resetting state and replaying logs.
+
+### `io.kestra.plugin.alibaba.fc.Invoke`
+
+Invokes a [Function Compute 3.0](https://www.alibabacloud.com/help/en/functioncompute/fc-3-0/developer-reference/sdk-reference-20230330) function. The task fails on a non-2xx response, and also when the function itself throws, which Function Compute reports with status 200 and an `X-Fc-Error-Type` header.
+
+- Required: `functionName`, and `accountId` unless `endpointOverride` is set.
+- Optional: `payload` (a map, list, number or boolean sent as JSON, or a string sent as is), `invocationType` (`SYNC` by default, or `ASYNC` to queue the event and return immediately), `qualifier` (version or alias, `LATEST` by default).
+- Timeout: a call waits for the response up to 90% of the task `timeout` (so the plugin error, not the generic Kestra timeout, is shown), or 10 minutes when it is not set. For longer functions, raise `timeout` or use `ASYNC`.
+- Outputs: `statusCode`, `requestId`, `uri` (the response body in internal storage), and `body` (the response as text, only when it is at most 512 KB; empty for `ASYNC`).

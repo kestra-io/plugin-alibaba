@@ -63,6 +63,7 @@ dependencies {
     }
 
     implementation "com.aliyun.openservices:aliyun-log:0.6.166"
+    implementation "com.aliyun:fc20230330:4.8.2"
     implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.2") {
         exclude group: "com.aliyun", module: "aliyun-java-sdk-core"
         exclude group: "com.aliyun", module: "aliyun-java-sdk-ram"

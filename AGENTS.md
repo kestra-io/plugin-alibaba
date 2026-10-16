@@ -3,12 +3,12 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
-- Includes OSS `Upload`, `Download`, `List`, `Delete`, `Copy`, and `Trigger`, MaxCompute `Query` and `Trigger`, and SLS `Query`, `Push`, and `Trigger`.
+- Includes OSS `Upload`, `Download`, `List`, `Delete`, `Copy`, and `Trigger`, MaxCompute `Query` and `Trigger`, SLS `Query`, `Push`, and `Trigger`, and Function Compute `Invoke`.
 
 ## Why
 
-- This plugin integrates Kestra with Alibaba Cloud OSS, MaxCompute, and Simple Log Service.
-- It moves files through OSS, runs MaxCompute SQL, and queries or ingests SLS logs with typed properties and secret masking. MaxCompute and SLS polling triggers persist typed watermarks or shard cursors in namespace KV.
+- This plugin integrates Kestra with Alibaba Cloud OSS, MaxCompute, Simple Log Service, and Function Compute.
+- It moves files through OSS, runs MaxCompute SQL, and queries or ingests SLS logs with typed properties and secret masking. MaxCompute and SLS polling triggers persist typed watermarks or shard cursors in namespace KV. Function Compute `Invoke` calls a function synchronously or asynchronously and exposes the response to downstream tasks.
 
 ## How
 
@@ -19,10 +19,11 @@ Single-module plugin. Source packages under `io.kestra.plugin.alibaba`:
 - `oss`
 - `maxcompute`
 - `sls`
+- `fc`
 
-The root package holds the shared connection base (`AlibabaConnectionInterface`, `AbstractConnection`). The `oss` package holds `AbstractOss`, which builds the OSS client, and the tasks.
+The root package holds the shared connection base (`AlibabaConnectionInterface`, `AbstractConnection`). The `oss` package holds `AbstractOss`, which builds the OSS client, and the tasks. The `fc` package holds `Invoke`, which builds its Function Compute client from the shared connection properties plus `accountId`.
 
-Tests exercise OSS, MaxCompute instance/result-tunnel APIs, and SLS endpoints through WireMock, so no cloud credentials are needed.
+Tests exercise OSS, MaxCompute instance/result-tunnel APIs, SLS and Function Compute endpoints through WireMock, so no cloud credentials are needed.
 
 ### Key Plugin Classes
 
@@ -37,6 +38,7 @@ Tests exercise OSS, MaxCompute instance/result-tunnel APIs, and SLS endpoints th
 - `io.kestra.plugin.alibaba.sls.Query`
 - `io.kestra.plugin.alibaba.sls.Push`
 - `io.kestra.plugin.alibaba.sls.Trigger`
+- `io.kestra.plugin.alibaba.fc.Invoke`
 
 ### Project Structure
 

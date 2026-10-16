@@ -21,6 +21,8 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.net.URI;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 @SuperBuilder
 @ToString
@@ -28,6 +30,9 @@ import java.net.URI;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractConnection extends Task implements AlibabaConnectionInterface {
+    private static final Pattern REGION_PATTERN = Pattern.compile("^[a-z0-9-]+$");
+    private static final Pattern ACCOUNT_ID_PATTERN = Pattern.compile("^[0-9]+$");
+
     @Schema(title = "AccessKey ID", description = "The AccessKey ID used to authenticate against Alibaba Cloud.")
     @NotNull
     @PluginProperty(group = "connection")
@@ -55,6 +60,46 @@ public abstract class AbstractConnection extends Task implements AlibabaConnecti
     public static String required(RunContext runContext, Property<String> property, String name) throws IllegalVariableEvaluationException {
         return runContext.render(property).as(String.class).filter(value -> !value.isBlank())
             .orElseThrow(() -> new IllegalArgumentException("`" + name + "` is required"));
+    }
+
+    public static String rRegion(RunContext runContext, AlibabaConnectionInterface connection) throws IllegalVariableEvaluationException {
+        var rRegion = runContext.render(connection.getRegion()).as(String.class).filter(value -> !value.isBlank())
+            .orElseThrow(() -> new IllegalArgumentException("Either `region` or `endpointOverride` must be set"));
+        if (!REGION_PATTERN.matcher(rRegion).matches()) {
+            throw new IllegalArgumentException("`region` must only contain lowercase letters, digits and dashes, got: " + rRegion);
+        }
+        return rRegion;
+    }
+
+    public static String rAccountId(RunContext runContext, Property<String> property, String name) throws IllegalVariableEvaluationException {
+        var rAccountId = required(runContext, property, name);
+        if (!ACCOUNT_ID_PATTERN.matcher(rAccountId).matches()) {
+            throw new IllegalArgumentException("`" + name + "` must only contain digits, got: " + rAccountId);
+        }
+        return rAccountId;
+    }
+
+    public static URI rEndpointOverride(RunContext runContext, AlibabaConnectionInterface connection) throws IllegalVariableEvaluationException {
+        var rEndpointOverride = runContext.render(connection.getEndpointOverride()).as(String.class).filter(value -> !value.isBlank()).orElse(null);
+        if (rEndpointOverride == null) {
+            return null;
+        }
+
+        URI uri;
+        try {
+            uri = URI.create(rEndpointOverride);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("`endpointOverride` is not a valid URL: " + rEndpointOverride, e);
+        }
+
+        var scheme = uri.getScheme() == null ? null : uri.getScheme().toLowerCase(Locale.ROOT);
+        if (uri.getHost() == null || scheme == null || !(scheme.equals("http") || scheme.equals("https"))) {
+            throw new IllegalArgumentException("`endpointOverride` must be an http or https URL, got: " + rEndpointOverride);
+        }
+        if (scheme.equals("http")) {
+            runContext.logger().warn("`endpointOverride` uses plain http, credentials and data are sent unencrypted to {}", uri.getAuthority());
+        }
+        return uri;
     }
 
     protected String renderedAccessKeyId(RunContext runContext) throws IllegalVariableEvaluationException {
