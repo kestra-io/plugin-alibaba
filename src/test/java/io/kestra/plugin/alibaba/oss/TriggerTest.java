@@ -60,7 +60,7 @@ class TriggerTest {
         stubObject();
         wireMock.stubFor(WireMock.delete(urlEqualTo("/my-bucket/landing/a.csv")).willReturn(aResponse().withStatus(204)));
 
-        var trigger = trigger(Trigger.Action.DELETE).build();
+        var trigger = trigger(Downloads.Action.DELETE).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
         var execution = trigger.evaluate(context.getKey(), context.getValue());
 
@@ -80,7 +80,7 @@ class TriggerTest {
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?><CopyObjectResult><LastModified>2026-10-10T08:00:00.000Z</LastModified><ETag>\"copy-etag\"</ETag></CopyObjectResult>")));
         wireMock.stubFor(WireMock.delete(urlEqualTo("/my-bucket/landing/a.csv")).willReturn(aResponse().withStatus(204)));
 
-        var trigger = trigger(Trigger.Action.MOVE).moveToPrefix(Property.ofValue("archive/")).build();
+        var trigger = trigger(Downloads.Action.MOVE).moveToPrefix(Property.ofValue("archive/")).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
         var execution = trigger.evaluate(context.getKey(), context.getValue());
 
@@ -96,7 +96,7 @@ class TriggerTest {
             .willReturn(aResponse().withStatus(200).withBody(
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ListBucketResult><Name>my-bucket</Name><Prefix></Prefix><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated><KeyCount>0</KeyCount></ListBucketResult>")));
 
-        var trigger = trigger(Trigger.Action.DELETE).build();
+        var trigger = trigger(Downloads.Action.DELETE).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(false));
@@ -111,7 +111,7 @@ class TriggerTest {
         wireMock.stubFor(WireMock.delete(urlEqualTo("/my-bucket/landing/b.csv"))
             .willReturn(aResponse().withStatus(403).withBody("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>AccessDenied</Code><Message>denied</Message></Error>")));
 
-        var trigger = trigger(Trigger.Action.DELETE).build();
+        var trigger = trigger(Downloads.Action.DELETE).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
         var execution = trigger.evaluate(context.getKey(), context.getValue());
 
@@ -132,7 +132,7 @@ class TriggerTest {
         wireMock.stubFor(get(urlEqualTo("/my-bucket/landing/b.csv")).willReturn(aResponse().withStatus(500)));
         wireMock.stubFor(WireMock.delete(urlEqualTo("/my-bucket/landing/a.csv")).willReturn(aResponse().withStatus(204)));
 
-        var trigger = trigger(Trigger.Action.DELETE).build();
+        var trigger = trigger(Downloads.Action.DELETE).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
         var execution = trigger.evaluate(context.getKey(), context.getValue());
 
@@ -143,8 +143,17 @@ class TriggerTest {
     }
 
     @Test
+    void rejectsActionNone() {
+        var trigger = trigger(Downloads.Action.NONE).build();
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> trigger.evaluate(context.getKey(), context.getValue()));
+        assertThat(exception.getMessage(), containsString("DELETE or MOVE"));
+    }
+
+    @Test
     void failsWhenMoveToPrefixIsMissing() {
-        var trigger = trigger(Trigger.Action.MOVE).build();
+        var trigger = trigger(Downloads.Action.MOVE).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         var exception = assertThrows(IllegalArgumentException.class, () -> trigger.evaluate(context.getKey(), context.getValue()));
@@ -155,7 +164,7 @@ class TriggerTest {
     void failsWhenMovedObjectsWouldMatchThePollFilterAgain() {
         stubListWithOneObject();
 
-        var trigger = trigger(Trigger.Action.MOVE).moveToPrefix(Property.ofValue("landing/")).build();
+        var trigger = trigger(Downloads.Action.MOVE).moveToPrefix(Property.ofValue("landing/")).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         var exception = assertThrows(IllegalArgumentException.class, () -> trigger.evaluate(context.getKey(), context.getValue()));
@@ -165,7 +174,7 @@ class TriggerTest {
 
     @Test
     void failsWhenMaxFilesIsOutOfRange() {
-        var trigger = trigger(Trigger.Action.DELETE).maxFiles(Property.ofValue(0)).build();
+        var trigger = trigger(Downloads.Action.DELETE).maxFiles(Property.ofValue(0)).build();
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         var exception = assertThrows(IllegalArgumentException.class, () -> trigger.evaluate(context.getKey(), context.getValue()));
@@ -207,7 +216,7 @@ class TriggerTest {
             .willReturn(aResponse().withStatus(200).withHeader("ETag", "\"etag-1\"").withBody("a,b")));
     }
 
-    private Trigger.TriggerBuilder<?, ?> trigger(Trigger.Action action) {
+    private Trigger.TriggerBuilder<?, ?> trigger(Downloads.Action action) {
         return Trigger.builder()
             .id("watch")
             .type(Trigger.class.getName())
