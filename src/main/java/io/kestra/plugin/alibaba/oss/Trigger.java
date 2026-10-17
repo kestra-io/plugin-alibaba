@@ -20,10 +20,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-import java.net.URI;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Optional;
 
 @SuperBuilder
@@ -69,7 +66,7 @@ import java.util.Optional;
         )
     }
 )
-public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<Trigger.Output> {
+public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<Downloads.Output> {
     @Schema(title = "Polling interval")
     @PluginProperty(group = "execution")
     @Builder.Default
@@ -131,7 +128,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     )
     @NotNull
     @PluginProperty(group = "main")
-    private Property<Action> action;
+    private Property<Downloads.Action> action;
 
     @Schema(
         title = "Move destination bucket",
@@ -150,22 +147,16 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         var runContext = conditionContext.getRunContext();
-        var logger = runContext.logger();
 
-        var rAction = runContext.render(this.action).as(Action.class)
+        var rAction = runContext.render(this.action).as(Downloads.Action.class)
             .orElseThrow(() -> new IllegalArgumentException("`action` is required"));
-        var rBucket = AbstractOss.required(runContext, this.bucket, "bucket");
-        String rMoveToPrefix = null;
-        if (rAction == Action.MOVE) {
-            rMoveToPrefix = AbstractOss.required(runContext, this.moveToPrefix, "moveToPrefix");
+        if (rAction == Downloads.Action.NONE) {
+            throw new IllegalArgumentException("`action` must be DELETE or MOVE, otherwise the same objects would start an execution on every poll");
         }
-        var rMoveToBucket = runContext.render(this.moveToBucket).as(String.class).orElse(rBucket);
-        var rPrefix = runContext.render(this.prefix).as(String.class).orElse(null);
-        var rRegexp = runContext.render(this.regexp).as(String.class).map(OssRegexp::compile).orElse(null);
 
-        var listed = List.builder()
+        var output = Downloads.builder()
             .id(this.getId())
-            .type(List.class.getName())
+            .type(Downloads.class.getName())
             .accessKeyId(this.accessKeyId)
             .accessKeySecret(this.accessKeySecret)
             .securityToken(this.securityToken)
@@ -176,148 +167,16 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .prefix(this.prefix)
             .regexp(this.regexp)
             .maxFiles(this.maxFiles)
+            .action(this.action)
+            .moveToBucket(this.moveToBucket)
+            .moveToPrefix(this.moveToPrefix)
             .build()
             .run(runContext);
 
-        if (listed.getObjects().isEmpty()) {
+        if (output.getObjects().isEmpty()) {
             return Optional.empty();
         }
 
-        if (rAction == Action.MOVE && rMoveToBucket.equals(rBucket)) {
-            for (var object : listed.getObjects()) {
-                var destination = rMoveToPrefix + object.getKey();
-                if ((rPrefix == null || destination.startsWith(rPrefix)) && (rRegexp == null || OssRegexp.matches(rRegexp, destination))) {
-                    throw new IllegalArgumentException("`moveToPrefix` must lead outside the polled objects, otherwise moved objects are picked up again: oss://" + rBucket + "/" + destination + " still matches `prefix` and `regexp`");
-                }
-            }
-        }
-
-        var downloaded = new ArrayList<Downloaded>();
-        var failures = new ArrayList<Exception>();
-        for (var object : listed.getObjects()) {
-            try {
-                var result = Download.builder()
-                    .id(this.getId())
-                    .type(Download.class.getName())
-                    .accessKeyId(this.accessKeyId)
-                    .accessKeySecret(this.accessKeySecret)
-                    .securityToken(this.securityToken)
-                    .region(this.region)
-                    .endpointOverride(this.endpointOverride)
-                    .pathStyleAccess(this.pathStyleAccess)
-                    .bucket(this.bucket)
-                    .key(Property.ofValue(object.getKey()))
-                    .build()
-                    .run(runContext);
-                downloaded.add(new Downloaded(object, result.getUri()));
-            } catch (Exception e) {
-                logger.error("Unable to download oss://{}/{}, it is left in place: {}", rBucket, object.getKey(), e.getMessage());
-                failures.add(e);
-            }
-        }
-
-        if (downloaded.isEmpty()) {
-            throw failures.getFirst();
-        }
-
-        var triggered = new ArrayList<TriggeredObject>();
-        for (var item : downloaded) {
-            var key = item.object().getKey();
-            var actionFailed = false;
-            try {
-                if (rAction == Action.DELETE) {
-                    Delete.builder()
-                        .id(this.getId())
-                        .type(Delete.class.getName())
-                        .accessKeyId(this.accessKeyId)
-                        .accessKeySecret(this.accessKeySecret)
-                        .securityToken(this.securityToken)
-                        .region(this.region)
-                        .endpointOverride(this.endpointOverride)
-                        .pathStyleAccess(this.pathStyleAccess)
-                        .bucket(this.bucket)
-                        .key(Property.ofValue(key))
-                        .build()
-                        .run(runContext);
-                } else {
-                    Copy.builder()
-                        .id(this.getId())
-                        .type(Copy.class.getName())
-                        .accessKeyId(this.accessKeyId)
-                        .accessKeySecret(this.accessKeySecret)
-                        .securityToken(this.securityToken)
-                        .region(this.region)
-                        .endpointOverride(this.endpointOverride)
-                        .pathStyleAccess(this.pathStyleAccess)
-                        .bucket(this.bucket)
-                        .key(Property.ofValue(key))
-                        .destinationBucket(Property.ofValue(rMoveToBucket))
-                        .destinationKey(Property.ofValue(rMoveToPrefix + key))
-                        .delete(Property.ofValue(true))
-                        .build()
-                        .run(runContext);
-                }
-            } catch (Exception e) {
-                actionFailed = true;
-                logger.error("Unable to {} oss://{}/{}, it will be picked up again by the next poll: {}", rAction, rBucket, key, e.getMessage());
-            }
-
-            triggered.add(TriggeredObject.builder()
-                .key(key)
-                .size(item.object().getSize())
-                .etag(item.object().getEtag())
-                .lastModified(item.object().getLastModified())
-                .uri(item.uri())
-                .actionFailed(actionFailed)
-                .build());
-        }
-
-        logger.info("Found {} objects in oss://{}", triggered.size(), rBucket);
-
-        var output = Output.builder()
-            .objects(triggered)
-            .build();
-
         return Optional.of(TriggerService.generateExecution(this, conditionContext, context, output));
-    }
-
-    private record Downloaded(OssObject object, URI uri) {
-    }
-
-    public enum Action {
-        DELETE,
-        MOVE
-    }
-
-    @Builder
-    @Getter
-    public static class TriggeredObject {
-        @Schema(title = "Object key")
-        private final String key;
-
-        @Schema(title = "Size in bytes")
-        private final Long size;
-
-        @Schema(title = "ETag")
-        private final String etag;
-
-        @Schema(title = "Last modified time")
-        private final Instant lastModified;
-
-        @Schema(title = "URI of the downloaded object in Kestra internal storage")
-        private final URI uri;
-
-        @Schema(
-            title = "Whether the delete or move failed",
-            description = "When true, the object is still in the bucket and is reported again by the next poll."
-        )
-        private final Boolean actionFailed;
-    }
-
-    @Builder
-    @Getter
-    public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "The objects that triggered the execution")
-        private final java.util.List<TriggeredObject> objects;
     }
 }

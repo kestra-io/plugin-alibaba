@@ -67,14 +67,37 @@ Copies an object in a single request, so it is limited to objects of at most 1 G
 - Optional: `destinationBucket` (defaults to `bucket`), `delete` (delete the source afterwards, which moves the object), `pathStyleAccess`.
 - Outputs: `bucket`, `key`, `etag`.
 
+### `io.kestra.plugin.alibaba.oss.Downloads`
+
+Lists the objects of a bucket by `prefix` and `regexp`, downloads up to `maxFiles` of them into Kestra internal storage and then leaves, deletes or moves each one. Objects are downloaded first, so nothing is removed from the bucket before it is in internal storage. An object that cannot be downloaded is skipped and left in place, and the task only fails when none can be downloaded. If the delete or move of an object fails, the task keeps going and sets `actionFailed` on that object.
+
+- Required: `bucket`.
+- Optional: `prefix`, `regexp`, `maxFiles` (1 to 1000, default 25), `action` (`NONE` by default, `DELETE` or `MOVE`), `pathStyleAccess`.
+- Required for `MOVE`: `moveToPrefix`, prepended to the original key. The task fails when a moved key in the same bucket would still match `prefix` and `regexp`. `moveToBucket` defaults to `bucket`.
+- Outputs: `objects` with `key`, `size`, `etag`, `lastModified`, `uri` (the downloaded file in internal storage) and `actionFailed`.
+
+### `io.kestra.plugin.alibaba.oss.CreateBucket`
+
+Creates a bucket in the region of the connection with the default settings (private, Standard storage). Bucket names are unique across Alibaba Cloud, so the task fails when the name is taken.
+
+- Required: `bucket`.
+- Outputs: `bucket`.
+
+### `io.kestra.plugin.alibaba.oss.DeleteBucket`
+
+Deletes a bucket. OSS refuses to delete a bucket that still contains objects or incomplete multipart uploads.
+
+- Required: `bucket`.
+- Outputs: `bucket`.
+
 ### `io.kestra.plugin.alibaba.oss.Trigger`
 
-Polls a bucket every `interval` (default 60 seconds), downloads up to `maxFiles` matching objects into Kestra internal storage and starts one execution with all of them. Objects are downloaded first, then each is deleted or moved so it is not picked up again. The execution starts even if the delete or move of some objects fails, and those objects are reported again by the next poll. An object that cannot be downloaded is left in place.
+Polls a bucket every `interval` (default 60 seconds) and starts one execution with the objects it downloaded. It runs `Downloads` on each poll, so it takes the same properties and has the same output, but `action` is required and must be `DELETE` or `MOVE`, otherwise the same objects would start an execution on every poll. The execution starts even if the delete or move of some objects fails, and those objects are reported again by the next poll.
 
 - Required: `bucket`, `action` (`DELETE` or `MOVE`).
-- Required for `MOVE`: `moveToPrefix`, prepended to the original key. The task fails when a moved key in the same bucket would still match `prefix` and `regexp`. `moveToBucket` defaults to `bucket`.
+- Required for `MOVE`: `moveToPrefix`. `moveToBucket` defaults to `bucket`.
 - Optional: `prefix`, `regexp`, `maxFiles`, `interval`, `pathStyleAccess`.
-- Outputs: `objects` with `key`, `size`, `etag`, `lastModified`, `uri` (the downloaded file in internal storage) and `actionFailed` (true when the delete or move failed and the object is still in the bucket).
+- Outputs: `objects` with `key`, `size`, `etag`, `lastModified`, `uri` and `actionFailed` (true when the delete or move failed and the object is still in the bucket).
 
 ### `io.kestra.plugin.alibaba.maxcompute.Query`
 

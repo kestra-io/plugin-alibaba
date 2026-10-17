@@ -1,7 +1,7 @@
 group: io.kestra.plugin.alibaba.oss
 name: "oss"
 title: "Alibaba Cloud OSS"
-description: "Upload, download, list, copy and delete objects in Alibaba Cloud Object Storage Service (OSS) buckets, and trigger flows from new objects"
+description: "Upload, download, list, copy and delete objects, create and delete buckets in Alibaba Cloud Object Storage Service (OSS), and trigger flows from new objects"
 body: ""
 videos: []
 createdBy: "Kestra Core Team"

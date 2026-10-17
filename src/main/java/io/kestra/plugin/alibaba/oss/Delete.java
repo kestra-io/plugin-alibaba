@@ -1,6 +1,7 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientException;
+import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -16,6 +17,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+
+import java.io.IOException;
 
 @SuperBuilder
 @ToString
@@ -62,16 +65,20 @@ public class Delete extends AbstractOss implements RunnableTask<Delete.Output> {
         var rKey = required(runContext, this.key, "key");
 
         try (var client = client(runContext)) {
-            try {
-                client.getOss().deleteObject(rBucket, rKey);
-                runContext.logger().debug("Deleted oss://{}/{}", rBucket, rKey);
+            remove(client.getOss(), runContext, rBucket, rKey);
+        }
 
-                return Output.builder()
-                    .key(rKey)
-                    .build();
-            } catch (OSSException | ClientException e) {
-                throw translate(e, "delete", "oss://" + rBucket + "/" + rKey, "write");
-            }
+        return Output.builder()
+            .key(rKey)
+            .build();
+    }
+
+    static void remove(OSS oss, RunContext runContext, String bucket, String key) throws IOException {
+        try {
+            oss.deleteObject(bucket, key);
+            runContext.logger().debug("Deleted oss://{}/{}", bucket, key);
+        } catch (OSSException | ClientException e) {
+            throw translate(e, "delete", "oss://" + bucket + "/" + key, "write");
         }
     }
 
