@@ -53,7 +53,7 @@ class BucketTest {
     void createBucket() throws Exception {
         wireMock.stubFor(put(urlPathMatching("/my-bucket/?")).willReturn(aResponse().withStatus(200)));
 
-        var output = createBucket().run(runContextFactory.of(Map.of()));
+        var output = createBucketTask().run(runContextFactory.of(Map.of()));
 
         assertThat(output.getBucket(), is("my-bucket"));
         wireMock.verify(putRequestedFor(urlPathMatching("/my-bucket/?")));
@@ -64,7 +64,7 @@ class BucketTest {
         wireMock.stubFor(put(urlPathMatching("/my-bucket/?"))
             .willReturn(aResponse().withStatus(409).withBody(error("BucketAlreadyExists", "The requested bucket name is not available."))));
 
-        var task = createBucket();
+        var task = createBucketTask();
 
         var exception = assertThrows(IOException.class, () -> task.run(runContextFactory.of(Map.of())));
         assertThat(exception.getMessage(), containsString("BucketAlreadyExists"));
@@ -90,7 +90,7 @@ class BucketTest {
     void deleteBucket() throws Exception {
         wireMock.stubFor(WireMock.delete(urlPathMatching("/my-bucket/?")).willReturn(aResponse().withStatus(204)));
 
-        var output = deleteBucket().run(runContextFactory.of(Map.of()));
+        var output = deleteBucketTask().run(runContextFactory.of(Map.of()));
 
         assertThat(output.getBucket(), is("my-bucket"));
         wireMock.verify(deleteRequestedFor(urlPathMatching("/my-bucket/?")));
@@ -101,7 +101,7 @@ class BucketTest {
         wireMock.stubFor(WireMock.delete(urlPathMatching("/my-bucket/?"))
             .willReturn(aResponse().withStatus(409).withBody(error("BucketNotEmpty", "The bucket you tried to delete is not empty."))));
 
-        var task = deleteBucket();
+        var task = deleteBucketTask();
 
         var exception = assertThrows(IOException.class, () -> task.run(runContextFactory.of(Map.of())));
         assertThat(exception.getMessage(), containsString("BucketNotEmpty"));
@@ -116,7 +116,7 @@ class BucketTest {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>" + code + "</Code><Message>" + message + "</Message></Error>";
     }
 
-    private CreateBucket createBucket() {
+    private CreateBucket createBucketTask() {
         return CreateBucket.builder()
             .id(IdUtils.create())
             .type(CreateBucket.class.getName())
@@ -128,7 +128,7 @@ class BucketTest {
             .build();
     }
 
-    private DeleteBucket deleteBucket() {
+    private DeleteBucket deleteBucketTask() {
         return DeleteBucket.builder()
             .id(IdUtils.create())
             .type(DeleteBucket.class.getName())
