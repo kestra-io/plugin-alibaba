@@ -108,7 +108,7 @@ public class RealtimeTrigger extends AbstractMnsTrigger implements RealtimeTrigg
     public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         var runContext = conditionContext.getRunContext();
 
-        return publisher(consumeTask().build(), runContext)
+        return publisher(consumeTask(), runContext)
             .map(message -> TriggerService.generateRealtimeExecution(this, conditionContext, context, message));
     }
 

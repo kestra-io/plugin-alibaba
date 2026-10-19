@@ -14,6 +14,8 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+import java.time.Duration;
+
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
@@ -73,7 +75,11 @@ public abstract class AbstractMnsTrigger extends AbstractTrigger implements Alib
     @Builder.Default
     protected Property<Boolean> autoDelete = Property.ofValue(true);
 
-    protected Consume.ConsumeBuilder<?, ?> consumeTask() {
+    protected Consume consumeTask() {
+        return consumeTask(Property.ofValue(Consume.DEFAULT_MAX_RECORDS), Property.ofValue(Consume.DEFAULT_MAX_DURATION));
+    }
+
+    protected Consume consumeTask(Property<Integer> maxRecords, Property<Duration> maxDuration) {
         return Consume.builder()
             .id(this.id)
             .type(Consume.class.getName())
@@ -85,6 +91,9 @@ public abstract class AbstractMnsTrigger extends AbstractTrigger implements Alib
             .accountId(this.accountId)
             .queue(this.queue)
             .serdeType(this.serdeType)
-            .autoDelete(this.autoDelete);
+            .autoDelete(this.autoDelete)
+            .maxRecords(maxRecords)
+            .maxDuration(maxDuration)
+            .build();
     }
 }

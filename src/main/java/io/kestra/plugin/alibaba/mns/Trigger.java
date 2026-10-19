@@ -89,11 +89,7 @@ public class Trigger extends AbstractMnsTrigger implements PollingTriggerInterfa
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         var runContext = conditionContext.getRunContext();
 
-        var output = consumeTask()
-            .maxRecords(this.maxRecords)
-            .maxDuration(this.maxDuration)
-            .build()
-            .run(runContext);
+        var output = consumeTask(this.maxRecords, this.maxDuration).run(runContext);
 
         if (output.getCount() == 0) {
             return Optional.empty();
