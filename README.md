@@ -45,6 +45,7 @@
 - SLS: `Query` searches logs, `Push` ingests structured data, and `Trigger` consumes new logs with persisted shard cursors.
 - Function Compute: `Invoke` calls a serverless function synchronously or asynchronously.
 - ECS: `List` lists instances, and `Start`, `Stop` and `Reboot` change their state.
+- MNS: `Publish` and `Consume` send and receive queue messages; `Trigger` and `RealtimeTrigger` start flows when messages arrive.
 
 See [plugin documentation](src/main/resources/doc/io.kestra.plugin.alibaba.md) for connection options and examples.
 
