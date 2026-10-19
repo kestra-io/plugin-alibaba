@@ -389,7 +389,7 @@ class MnsTest {
             .waitTime(Property.ofValue(Duration.ZERO))
             .build();
 
-        var flux = trigger.publisher(trigger.consumeTask().build(), runContextFactory.of(Map.of()))
+        var flux = trigger.publisher(trigger.consumeTask(), runContextFactory.of(Map.of()))
             .subscribeOn(Schedulers.boundedElastic());
 
         var e = assertThrows(IllegalArgumentException.class, () -> flux.blockLast(Duration.ofSeconds(10)));
@@ -403,7 +403,7 @@ class MnsTest {
 
         var trigger = realtimeTrigger();
         try {
-            var received = trigger.publisher(trigger.consumeTask().build(), runContextFactory.of(Map.of()))
+            var received = trigger.publisher(trigger.consumeTask(), runContextFactory.of(Map.of()))
                 .subscribeOn(Schedulers.boundedElastic())
                 .take(1)
                 .collectList()
@@ -428,7 +428,7 @@ class MnsTest {
         wireMock.stubFor(get(urlPathEqualTo(PATH)).willReturn(error(404, "MessageNotExist").withFixedDelay(5000)));
 
         var trigger = realtimeTrigger();
-        var subscription = trigger.publisher(trigger.consumeTask().build(), runContextFactory.of(Map.of()))
+        var subscription = trigger.publisher(trigger.consumeTask(), runContextFactory.of(Map.of()))
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe();
         try {
@@ -451,7 +451,7 @@ class MnsTest {
 
         var trigger = realtimeTrigger();
         var received = new CopyOnWriteArrayList<Object>();
-        var subscription = trigger.publisher(trigger.consumeTask().build(), runContextFactory.of(Map.of()))
+        var subscription = trigger.publisher(trigger.consumeTask(), runContextFactory.of(Map.of()))
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(received::add);
         try {
@@ -483,7 +483,7 @@ class MnsTest {
             .build();
 
         var errors = new CopyOnWriteArrayList<Throwable>();
-        var subscription = trigger.publisher(trigger.consumeTask().build(), runContextFactory.of(Map.of()))
+        var subscription = trigger.publisher(trigger.consumeTask(), runContextFactory.of(Map.of()))
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(message -> {}, errors::add);
         try {
@@ -509,7 +509,7 @@ class MnsTest {
             .batchSize(Property.ofValue(50))
             .build();
 
-        var flux = trigger.publisher(trigger.consumeTask().build(), runContextFactory.of(Map.of()))
+        var flux = trigger.publisher(trigger.consumeTask(), runContextFactory.of(Map.of()))
             .subscribeOn(Schedulers.boundedElastic());
 
         var e = assertThrows(IllegalArgumentException.class, () -> flux.blockLast(Duration.ofSeconds(10)));
@@ -543,7 +543,7 @@ class MnsTest {
             .queue(Property.ofValue("orders"))
             .build();
 
-        var flux = trigger.publisher(trigger.consumeTask().build(), runContextFactory.of(Map.of()))
+        var flux = trigger.publisher(trigger.consumeTask(), runContextFactory.of(Map.of()))
             .subscribeOn(Schedulers.boundedElastic());
 
         var e = assertThrows(IllegalStateException.class, () -> flux.blockLast(Duration.ofSeconds(30)));
