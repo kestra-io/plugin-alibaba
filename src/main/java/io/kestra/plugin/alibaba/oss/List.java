@@ -1,6 +1,7 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientException;
+import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSException;
 import com.aliyun.oss.model.ListObjectsV2Request;
 import io.kestra.core.models.annotations.Example;
@@ -17,7 +18,9 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.regex.Pattern;
 
 @SuperBuilder
 @ToString
@@ -53,6 +56,7 @@ import java.util.ArrayList;
 public class List extends AbstractOss implements RunnableTask<List.Output> {
     private static final int PAGE_SIZE = 1000;
     private static final int MAX_FILES_LIMIT = 1000;
+    static final int DEFAULT_MAX_FILES = 25;
 
     @Schema(
         title = "Prefix",
@@ -89,52 +93,69 @@ public class List extends AbstractOss implements RunnableTask<List.Output> {
         var rPrefix = runContext.render(this.prefix).as(String.class).orElse(null);
         var rDelimiter = runContext.render(this.delimiter).as(String.class).orElse(null);
         var rRegexp = runContext.render(this.regexp).as(String.class).map(OssRegexp::compile).orElse(null);
-        var rMaxFiles = runContext.render(this.maxFiles).as(Integer.class).orElse(25);
-        if (rMaxFiles < 1 || rMaxFiles > MAX_FILES_LIMIT) {
-            throw new IllegalArgumentException("`maxFiles` must be between 1 and " + MAX_FILES_LIMIT + ", got: " + rMaxFiles);
+        var rMaxFiles = checkMaxFiles(runContext.render(this.maxFiles).as(Integer.class).orElse(DEFAULT_MAX_FILES));
+
+        Listing listing;
+        try (var client = client(runContext)) {
+            listing = list(client.getOss(), rBucket, rPrefix, rDelimiter, rRegexp, rMaxFiles);
         }
 
+        listing.warnIfLimited(runContext, rBucket, rMaxFiles);
+        runContext.logger().debug("Listed {} objects in oss://{}", listing.objects().size(), rBucket);
+
+        return Output.builder()
+            .objects(listing.objects())
+            .build();
+    }
+
+    static int checkMaxFiles(int maxFiles) {
+        if (maxFiles < 1 || maxFiles > MAX_FILES_LIMIT) {
+            throw new IllegalArgumentException("`maxFiles` must be between 1 and " + MAX_FILES_LIMIT + ", got: " + maxFiles);
+        }
+        return maxFiles;
+    }
+
+    static Listing list(OSS oss, String bucket, String prefix, String delimiter, Pattern regexp, int maxFiles) throws IOException {
         var objects = new ArrayList<OssObject>();
         var limited = false;
 
-        try (var client = client(runContext)) {
-            try {
-                var request = new ListObjectsV2Request(rBucket);
-                request.setPrefix(rPrefix);
-                request.setDelimiter(rDelimiter);
-                request.setMaxKeys(PAGE_SIZE);
+        try {
+            var request = new ListObjectsV2Request(bucket);
+            request.setPrefix(prefix);
+            request.setDelimiter(delimiter);
+            request.setMaxKeys(PAGE_SIZE);
 
-                boolean truncated;
-                do {
-                    var result = client.getOss().listObjectsV2(request);
-                    for (var summary : result.getObjectSummaries()) {
-                        var key = summary.getKey();
-                        if (key.endsWith("/") || (rRegexp != null && !OssRegexp.matches(rRegexp, key))) {
-                            continue;
-                        }
-                        if (objects.size() >= rMaxFiles) {
-                            limited = true;
-                            break;
-                        }
-                        objects.add(OssObject.of(summary));
+            boolean truncated;
+            do {
+                var result = oss.listObjectsV2(request);
+                for (var summary : result.getObjectSummaries()) {
+                    var key = summary.getKey();
+                    if (key.endsWith("/") || (regexp != null && !OssRegexp.matches(regexp, key))) {
+                        continue;
                     }
+                    if (objects.size() >= maxFiles) {
+                        limited = true;
+                        break;
+                    }
+                    objects.add(OssObject.of(summary));
+                }
 
-                    truncated = result.isTruncated();
-                    request.setContinuationToken(result.getNextContinuationToken());
-                } while (truncated && !limited);
-            } catch (OSSException | ClientException e) {
-                throw translate(e, "list", "oss://" + rBucket + "/" + (rPrefix == null ? "" : rPrefix), "list");
+                truncated = result.isTruncated();
+                request.setContinuationToken(result.getNextContinuationToken());
+            } while (truncated && !limited);
+        } catch (OSSException | ClientException e) {
+            throw translate(e, "list", "oss://" + bucket + "/" + (prefix == null ? "" : prefix), "list");
+        }
+
+        return new Listing(objects, limited);
+    }
+
+    record Listing(java.util.List<OssObject> objects, boolean limited) {
+        void warnIfLimited(RunContext runContext, String bucket, int maxFiles) {
+            if (limited) {
+                runContext.logger().warn("More than {} objects match in oss://{}, only the first {} are returned", maxFiles, bucket, maxFiles);
             }
         }
-
-        if (limited) {
-            runContext.logger().warn("More than {} objects match in oss://{}, only the first {} are returned", rMaxFiles, rBucket, rMaxFiles);
-        }
-        runContext.logger().debug("Listed {} objects in oss://{}", objects.size(), rBucket);
-
-        return Output.builder()
-            .objects(objects)
-            .build();
     }
 
     @Builder

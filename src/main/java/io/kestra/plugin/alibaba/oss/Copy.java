@@ -1,6 +1,7 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientException;
+import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSException;
 import com.aliyun.oss.model.CopyObjectResult;
 import io.kestra.core.models.annotations.Example;
@@ -94,44 +95,49 @@ public class Copy extends AbstractOss implements RunnableTask<Copy.Output> {
         var rDestinationKey = required(runContext, this.destinationKey, "destinationKey");
         var rDelete = runContext.render(this.delete).as(Boolean.class).orElse(false);
 
-        if (rBucket.equals(rDestinationBucket) && rKey.equals(rDestinationKey)) {
-            throw new IllegalArgumentException("The destination must differ from the source, got: oss://" + rBucket + "/" + rKey);
-        }
-
-        var source = "oss://" + rBucket + "/" + rKey;
-        var destination = "oss://" + rDestinationBucket + "/" + rDestinationKey;
-
+        String etag;
         try (var client = client(runContext)) {
-            var oss = client.getOss();
-
-            CopyObjectResult result;
-            try {
-                var size = oss.getObjectMetadata(rBucket, rKey).getContentLength();
-                if (size > MAX_COPY_SIZE) {
-                    throw new IllegalArgumentException("Unable to copy " + source + ": it is " + size + " bytes and a single-request copy is limited to 1 GB (" + MAX_COPY_SIZE + " bytes)");
-                }
-
-                result = oss.copyObject(rBucket, rKey, rDestinationBucket, rDestinationKey);
-                runContext.logger().debug("Copied {} to {}", source, destination);
-            } catch (OSSException | ClientException e) {
-                throw translate(e, "copy", source + " to " + destination, "read and write");
-            }
-
-            if (rDelete) {
-                try {
-                    oss.deleteObject(rBucket, rKey);
-                    runContext.logger().debug("Deleted {}", source);
-                } catch (OSSException | ClientException e) {
-                    throw new IOException("The object was copied to " + destination + " but the source " + source + " could not be deleted and was kept: " + translate(e, "delete", source, "write").getMessage(), e);
-                }
-            }
-
-            return Output.builder()
-                .bucket(rDestinationBucket)
-                .key(rDestinationKey)
-                .etag(result.getETag())
-                .build();
+            etag = copy(client.getOss(), runContext, rBucket, rKey, rDestinationBucket, rDestinationKey, rDelete);
         }
+
+        return Output.builder()
+            .bucket(rDestinationBucket)
+            .key(rDestinationKey)
+            .etag(etag)
+            .build();
+    }
+
+    static String copy(OSS oss, RunContext runContext, String bucket, String key, String destinationBucket, String destinationKey, boolean deleteSource) throws IOException {
+        if (bucket.equals(destinationBucket) && key.equals(destinationKey)) {
+            throw new IllegalArgumentException("The destination must differ from the source, got: oss://" + bucket + "/" + key);
+        }
+
+        var source = "oss://" + bucket + "/" + key;
+        var destination = "oss://" + destinationBucket + "/" + destinationKey;
+
+        CopyObjectResult result;
+        try {
+            var size = oss.getObjectMetadata(bucket, key).getContentLength();
+            if (size > MAX_COPY_SIZE) {
+                throw new IllegalArgumentException("Unable to copy " + source + ": it is " + size + " bytes and a single-request copy is limited to 1 GB (" + MAX_COPY_SIZE + " bytes)");
+            }
+
+            result = oss.copyObject(bucket, key, destinationBucket, destinationKey);
+            runContext.logger().debug("Copied {} to {}", source, destination);
+        } catch (OSSException | ClientException e) {
+            throw translate(e, "copy", source + " to " + destination, "read and write");
+        }
+
+        if (deleteSource) {
+            try {
+                oss.deleteObject(bucket, key);
+                runContext.logger().debug("Deleted {}", source);
+            } catch (OSSException | ClientException e) {
+                throw new IOException("The object was copied to " + destination + " but the source " + source + " could not be deleted and was kept: " + translate(e, "delete", source, "write").getMessage(), e);
+            }
+        }
+
+        return result.getETag();
     }
 
     @Builder

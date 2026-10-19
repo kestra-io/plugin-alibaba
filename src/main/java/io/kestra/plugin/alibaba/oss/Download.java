@@ -1,6 +1,7 @@
 package io.kestra.plugin.alibaba.oss;
 
 import com.aliyun.oss.ClientException;
+import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -17,6 +18,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
@@ -67,26 +69,35 @@ public class Download extends AbstractOss implements RunnableTask<Download.Outpu
         var rKey = required(runContext, this.key, "key");
 
         try (var client = client(runContext)) {
-            try {
-                var object = client.getOss().getObject(rBucket, rKey);
+            var fetched = fetch(client.getOss(), runContext, rBucket, rKey);
 
-                var tempFile = runContext.workingDir().createTempFile();
-                try (InputStream inputStream = object.getObjectContent()) {
-                    Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                }
-
-                var size = Files.size(tempFile);
-                var uri = runContext.storage().putFile(tempFile.toFile());
-                runContext.logger().debug("Downloaded oss://{}/{} ({} bytes)", rBucket, rKey, size);
-
-                return Output.builder()
-                    .uri(uri)
-                    .size(size)
-                    .build();
-            } catch (OSSException | ClientException e) {
-                throw translate(e, "download", "oss://" + rBucket + "/" + rKey, "read");
-            }
+            return Output.builder()
+                .uri(fetched.uri())
+                .size(fetched.size())
+                .build();
         }
+    }
+
+    static Fetched fetch(OSS oss, RunContext runContext, String bucket, String key) throws IOException {
+        try {
+            var object = oss.getObject(bucket, key);
+
+            var tempFile = runContext.workingDir().createTempFile();
+            try (InputStream inputStream = object.getObjectContent()) {
+                Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            var size = Files.size(tempFile);
+            var uri = runContext.storage().putFile(tempFile.toFile());
+            runContext.logger().debug("Downloaded oss://{}/{} ({} bytes)", bucket, key, size);
+
+            return new Fetched(uri, size);
+        } catch (OSSException | ClientException e) {
+            throw translate(e, "download", "oss://" + bucket + "/" + key, "read");
+        }
+    }
+
+    record Fetched(URI uri, long size) {
     }
 
     @Builder

@@ -81,6 +81,19 @@ public abstract class AbstractOss extends AbstractConnection {
         );
     }
 
+    protected static IOException translateBucket(RuntimeException e, String operation, String bucket, String access) {
+        if (e instanceof OSSException ossException) {
+            var message = ossException.getErrorMessage();
+            var detail = message == null || message.isBlank() ? "" : ": " + message;
+            return new IOException(
+                "Unable to " + operation + " oss://" + bucket + " (" + ossException.getErrorCode() + ")" + detail + ". Check that the credentials have " + access + " access",
+                e
+            );
+        }
+
+        return translate(e, operation, "oss://" + bucket, access);
+    }
+
     private static String redactUrls(String message) {
         return message == null ? "no details" : URL_PATTERN.matcher(message).replaceAll("<url>");
     }

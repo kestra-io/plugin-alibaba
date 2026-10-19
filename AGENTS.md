@@ -3,7 +3,7 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.alibaba`.
-- Includes OSS `Upload`, `Download`, `List`, `Delete`, `Copy`, and `Trigger`, MaxCompute `Query` and `Trigger`, SLS `Query`, `Push`, and `Trigger`, Function Compute `Invoke`, ECS `List`, `Start`, `Stop`, and `Reboot`, and MNS `Publish`, `Consume`, `Trigger`, and `RealtimeTrigger`.
+- Includes OSS `Upload`, `Download`, `Downloads`, `List`, `Delete`, `Copy`, `CreateBucket`, `DeleteBucket`, and `Trigger`, MaxCompute `Query` and `Trigger`, SLS `Query`, `Push`, and `Trigger`, Function Compute `Invoke`, ECS `List`, `Start`, `Stop`, and `Reboot`, and MNS `Publish`, `Consume`, `Trigger`, and `RealtimeTrigger`.
 
 ## Why
 
@@ -23,7 +23,7 @@ Single-module plugin. Source packages under `io.kestra.plugin.alibaba`:
 - `ecs`
 - `mns`
 
-The root package holds the shared connection base (`AlibabaConnectionInterface`, `AbstractConnection`). The `oss` package holds `AbstractOss`, which builds the OSS client, and the tasks. The `fc` package holds `Invoke`, which builds its Function Compute client from the shared connection properties plus `accountId`. The `ecs` package holds `AbstractEcs`, which builds the ECS client, `AbstractInstanceAction`, shared by `Start`, `Stop` and `Reboot`, and `List`. The `mns` package holds `AbstractMns`, which builds the MNS client, the `Publish` and `Consume` tasks, and `AbstractMnsTrigger`, shared by `Trigger` and `RealtimeTrigger`.
+The root package holds the shared connection base (`AlibabaConnectionInterface`, `AbstractConnection`). The `oss` package holds `AbstractOss`, which builds the OSS client, and the tasks. `List`, `Download`, `Delete` and `Copy` expose static helpers that take an OSS client, so `Downloads` and `Trigger` reuse them with a single client. The `fc` package holds `Invoke`, which builds its Function Compute client from the shared connection properties plus `accountId`. The `ecs` package holds `AbstractEcs`, which builds the ECS client, `AbstractInstanceAction`, shared by `Start`, `Stop` and `Reboot`, and `List`. The `mns` package holds `AbstractMns`, which builds the MNS client, the `Publish` and `Consume` tasks, and `AbstractMnsTrigger`, shared by `Trigger` and `RealtimeTrigger`.
 
 Tests exercise OSS, MaxCompute instance/result-tunnel APIs, SLS, Function Compute, ECS and MNS endpoints through WireMock, so no cloud credentials are needed.
 
@@ -31,9 +31,12 @@ Tests exercise OSS, MaxCompute instance/result-tunnel APIs, SLS, Function Comput
 
 - `io.kestra.plugin.alibaba.oss.Upload`
 - `io.kestra.plugin.alibaba.oss.Download`
+- `io.kestra.plugin.alibaba.oss.Downloads`
 - `io.kestra.plugin.alibaba.oss.List`
 - `io.kestra.plugin.alibaba.oss.Delete`
 - `io.kestra.plugin.alibaba.oss.Copy`
+- `io.kestra.plugin.alibaba.oss.CreateBucket`
+- `io.kestra.plugin.alibaba.oss.DeleteBucket`
 - `io.kestra.plugin.alibaba.oss.Trigger`
 - `io.kestra.plugin.alibaba.maxcompute.Query`
 - `io.kestra.plugin.alibaba.maxcompute.Trigger`

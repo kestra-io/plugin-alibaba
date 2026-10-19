@@ -66,4 +66,17 @@ class FlowValidationTest {
             }
         }
     }
+
+    @Test
+    void allOssPluginExamplesValidate() {
+        for (var type : List.of(io.kestra.plugin.alibaba.oss.Upload.class, io.kestra.plugin.alibaba.oss.Download.class,
+            io.kestra.plugin.alibaba.oss.Downloads.class, io.kestra.plugin.alibaba.oss.List.class,
+            io.kestra.plugin.alibaba.oss.Delete.class, io.kestra.plugin.alibaba.oss.Copy.class,
+            io.kestra.plugin.alibaba.oss.CreateBucket.class, io.kestra.plugin.alibaba.oss.DeleteBucket.class,
+            io.kestra.plugin.alibaba.oss.Trigger.class)) {
+            for (var example : type.getAnnotation(Plugin.class).examples()) {
+                validate(String.join("\n", example.code()));
+            }
+        }
+    }
 }
