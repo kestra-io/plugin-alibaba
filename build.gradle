@@ -70,7 +70,7 @@ dependencies {
         exclude group: "org.jacoco", module: "org.jacoco.agent"
     }
     runtimeOnly "com.sun.xml.bind:jaxb-impl:2.3.9"
-    implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.2") {
+    implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.5") {
         exclude group: "com.aliyun", module: "aliyun-java-sdk-core"
         exclude group: "com.aliyun", module: "aliyun-java-sdk-ram"
         exclude group: "com.aliyun", module: "aliyun-java-sdk-kms"
