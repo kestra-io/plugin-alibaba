@@ -93,6 +93,8 @@ configurations.configureEach {
         "com.fasterxml.jackson.core:jackson-databind:2.21.7",
         "com.fasterxml.jackson.core:jackson-core:2.21.7"
     )
+    // SEC-0369: platform BOM pins guava 33.4.8-jre, remove once it ships >= 33.7.2.
+    resolutionStrategy.force "com.google.guava:guava:33.7.2-jre"
 }
 
 
