@@ -68,6 +68,8 @@ dependencies {
     implementation("com.aliyun.mns:aliyun-sdk-mns:2.0.0") {
         exclude group: "org.json", module: "json"
         exclude group: "org.jacoco", module: "org.jacoco.agent"
+        // SEC-0290 (CVE-2022-41404): ini4j has no fixed release and is only used by ProfileCredentialsProvider (INI credentials file), which the plugin never uses.
+        exclude group: "org.ini4j", module: "ini4j"
     }
     runtimeOnly "com.sun.xml.bind:jaxb-impl:2.3.9"
     implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.5") {
