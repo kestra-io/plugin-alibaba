@@ -96,7 +96,7 @@ configurations.configureEach {
         "com.fasterxml.jackson.core:jackson-core:2.22.4"
     )
     // SEC-0369: platform BOM pins guava 33.4.8-jre, remove once it ships >= 33.7.2.
-    resolutionStrategy.force "com.google.guava:guava:33.7.2-jre"
+    resolutionStrategy.force "com.google.guava:guava:33.8.0-jre"
     // SEC-0297: stax-api 1.0-2 declares a GPL license in its POM; the JDK java.xml module already provides javax.xml.stream.
     exclude group: "javax.xml.stream", module: "stax-api"
 }
