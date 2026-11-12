@@ -97,6 +97,8 @@ configurations.configureEach {
     )
     // SEC-0369: platform BOM pins guava 33.4.8-jre, remove once it ships >= 33.7.2.
     resolutionStrategy.force "com.google.guava:guava:33.7.2-jre"
+    // SEC-0370: platform BOM pins snappy-java 1.1.10.7 (DoS via unbounded allocation), remove once it ships >= 1.1.10.9.
+    resolutionStrategy.force "org.xerial.snappy:snappy-java:1.1.10.12"
     // SEC-0297: stax-api 1.0-2 declares a GPL license in its POM; the JDK java.xml module already provides javax.xml.stream.
     exclude group: "javax.xml.stream", module: "stax-api"
 }
