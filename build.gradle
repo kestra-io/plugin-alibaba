@@ -71,7 +71,7 @@ dependencies {
         // SEC-0290 (CVE-2022-41404): ini4j has no fixed release and is only used by ProfileCredentialsProvider (INI credentials file), which the plugin never uses.
         exclude group: "org.ini4j", module: "ini4j"
     }
-    runtimeOnly "com.sun.xml.bind:jaxb-impl:2.3.9"
+    runtimeOnly "com.sun.xml.bind:jaxb-impl:4.0.9"
     implementation("com.aliyun.oss:aliyun-sdk-oss:3.18.5") {
         exclude group: "com.aliyun", module: "aliyun-java-sdk-core"
         exclude group: "com.aliyun", module: "aliyun-java-sdk-ram"
